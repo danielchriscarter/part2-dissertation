@@ -79,7 +79,7 @@ This project aims to produce an authentication system for web applications, such
 
   \draw [arrow, bend left] (user) edge node[right, yshift=-0.6cm] {Kerberos ticket} (webserver);
 
-  \draw [arrow, bend left] (webserver) edge node[right] {\parbox{0.5\textwidth}{\raggedright \texttt{SELECT} the records which this ticket can access (\textbf{delegated ticket})}} (database);
+  \draw [arrow, bend left] (webserver) edge node[right] {\parbox{0.5\textwidth}{\raggedright \texttt{SELECT} the records which this ticket can access (\textbf{delegated ticket} of Alice)}} (database);
 
   \draw [arrow, bend left] (database) edge node[left] {\parbox{0.4\textwidth}{\hfill Here is Alice's data}} (webserver);
   \draw [arrow, bend left] (webserver) edge node[left] {\parbox{0.4\textwidth}{\hfill Here is your data}} (user);        
@@ -109,6 +109,18 @@ The basic workings of the protocol are as follows:
 \end{itemize}
 
 \section{Implementation}
+
+\subsection{Kerberos Ticket Delegation}
+A core aspect of this project is how a ticket can be \textit{delegated} from one server to another, such that the ticket used to log into the web app can be used to authenticate to another system.
+
+\subsubsection{Unconstrained Delegation}
+
+\subsubsection{Constrained Delegation (S4U2proxy)}
+The \textit{Service for User to Proxy} (S4U2proxy) system is an extension to the basic Kerberos setup that allows one service to obtain a ticket to another service (on behalf of a principal) in a controlled manner. Once a service has been marked as ``permitted'' to obtain tickets for another, it can do so simply by making a request to the KDC.
+
+This requires a more complex setup of permission models in the KDC than simply a list of principals, since the KDC must now decide which services can delegate tickets to which others. The default back-end for MIT Kerberos does not support this, but moving the user data into an LDAP server and using this as the data source allows the relevant \texttt{krbAllowedToDelegateTo} permission to be set on the user\cite{KRB-DELEG}.
+
+Note that this is \textbf{not} the same as S4U2self, which (if configured) effectively allows a server to bypass Kerberos authentication completely and obtain a ticket on behalf of a client, rather than being given a ticket by the client as part of the authentication process.
 
 \subsection{Implementing SQL Procedures}
 As one aspect of the project, the database server must be able to provide the correct set of records to each user without exposing the rest of the table. Since PostgreSQL does not offer the ability to selectively allow a user to query certain rows in a table, this can instead be acheived using stored procedures. However, these are not a standardised construct in SQL, and even within PostgreSQL there are multiple ways to achieve this.
@@ -147,7 +159,8 @@ AND p.owner = user;
 \bibitem{postgres-SEC_DEF} PostgreSQL documentation: \texttt{CREATE FUNCTION} \url{https://www.postgresql.org/docs/current/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY} (accessed 22/02/2021)
 
 \bibitem{postgres-CREATE_RULE} PostgreSQL documentation: \texttt{CREATE RULE} \url{https://www.postgresql.org/docs/current/sql-createrule.html} (accessed 22/02/2021)
-\end{thebibliography}
 
+\bibitem{KRB-DELEG}  Kerberos: delegation and s4u2proxy (Simo Sorce, 12/02/2012) \url{https://ssimo.org/blog/id_011.html} (accessed 02/02/2021)
+\end{thebibliography}
 
 \end{document}
