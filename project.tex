@@ -4,6 +4,7 @@
 \usepackage[a4paper, margin=1in]{geometry}
 \usepackage{cite}
 \usepackage{upquote}
+\usepackage{parskip}
 \usepackage{tikz}
 \usepackage{textcomp}
 
@@ -64,6 +65,49 @@ The following diagram represents an example of a typical current setup, and the 
   \draw [arrow, bend left] (webserver) edge node[left] {\parbox{0.4\textwidth}{\hfill Here is everyone's data}} (user);        
 \end{tikzpicture}
 
+
+
+\section{Preparation}
+
+\subsection{Kerberos}
+The Kerberos protocol works based on a system of \textit{tickets}, which are managed by a \textit{Key Distribution Centre} (KDC). The basic requirement of the system is to allow a centralised database of users (for example, the main login directory in an office) who can demonstrate their identity in order to log in to applications and services, but \textit{without} having to store or transmit passwords or other long-term secrets on potentially untrusted machines.
+
+The basic workings of the protocol are as follows:
+
+\begin{itemize}
+\item
+  A user initiates a session by reqesting a Kerberos ticket from the KDC, authenticating using their password.
+\item
+  The KDC returns a \textit{ticket-granting ticket} (TGT), and returns it encrypted using the user's password.
+\item
+  The user decrypts the TGT, and the user's machine can then discard the stored password.
+\item
+  When the user wants to access a service, they send the TGT back to the KDC along with an identifier for the service which they want to use.
+\item
+  The TGT grants the user a \textit{service ticket}, which the user then passes on to the service. The service is then able to use that ticket for authentication.
+\end{itemize}
+
+The following listing shows a client which has obtained both a TGT and a service ticket. The ticket in the first line (\verb+krbtgt/LOCAL@LOCAL+) is the \textit{ticket-granting ticket} which the client obtained when first authenticating to the KDC, and the second (\verb+HTTP/krbsite.local@LOCAL+) is a \textit{service ticket} to log in to the \verb+HTTP+ service on \verb+krbsite.local+ (i.e.\ to access the web page hosted on that server).
+
+\begin{quote}
+\begin{verbatim}
+daniel@Daniel-Laptop:~$ klist
+Ticket cache: FILE:/tmp/krb5cc_1000
+Default principal: dcc@LOCAL
+
+Valid starting     Expires            Service principal
+02/04/21 15:36:01  03/04/21 01:36:01  krbtgt/LOCAL@LOCAL
+	renew until 03/04/21 15:36:01
+02/04/21 15:36:07  03/04/21 01:36:01  HTTP/krbsite.local@LOCAL
+	renew until 03/04/21 15:36:01
+\end{verbatim}
+\end{quote}
+
+\subsection{Kerberos Ticket Delegation}
+In addition to use for authentication, Kerberos supports a method of \textit{delegating} tickets. This means that a principal $A$ can pass a ticket to a service $X$ as a means of authentication, and $X$ can pass the ticket on to a third system $Y$ to request resources on the user's behalf.
+
+This is valuable because it means that $X$ can access resources which ``belong'' to $A$, without $X$ needing to have direct access to $Y$. This means that less trust in $X$ is needed (since it does not need privileged access to $Y$), and so the types of attacks discussed above become much less likely.
+
 \subsection{Project Summary}
 This project aims to produce an authentication system for web applications, such that a user can authenticate to a web application using a Kerberos ticket and the web application can use this ticket to obtain the user's data from a database. The overall structure of the authentication process is as shown below, noting that the application itself does not have any other access means of accessing the database, so an attack such as the one depicted above cannot take place.
 
@@ -85,28 +129,10 @@ This project aims to produce an authentication system for web applications, such
   \draw [arrow, bend left] (webserver) edge node[left] {\parbox{0.4\textwidth}{\hfill Here is your data}} (user);        
 \end{tikzpicture}
 
+\subsection{Related Work}
+The original concept for this project was based on a system developed by Microsoft in IIS 5.0, which added a ``negotiate'' extension to the HTTP protocol for use with Kerberos. This standard is described in RFC 4559\cite{RFC4559} and described a system which allowed a user to log into a web application, from which a suitably equipped application could delegate the ticket to another system such as a database server. This permitted a user to log in to the website without needing a password, in effectively the same way as in the diagram above.
 
-\section{Preparation}
-
-\subsection{Kerberos}
-The Kerberos protocol works based on a system of \textit{tickets}, which are managed by a \textit{Key Distribution Centre} (KDC). The basic requirement of the system is to allow a centralised database of users (for example, the main login directory in an office) who can demonstrate their identity in order to log in to applications and services, but \textit{without} having to store or transmit passwords or other long-term secrets on potentially untrusted machines.
-
-The basic workings of the protocol are as follows:
-
-\begin{itemize}
-\item
-  A user initiates a session by reqesting a Kerberos ticket from the KDC, authenticating using their password.
-\item
-  The KDC returns a \textit{ticket-granting ticket} (TGT), and returns it encrypted using the user's password.
-\item
-  The user decrypts the TGT, and the user's machine can then discard the stored password.
-\item
-  When the user wants to access a service, they send the TGT back to the KDC along with an identifier for the service which they want to use.
-\item
-  The TGT grants the user a \textit{service ticket}, which the user then passes on to the service. The service is then able to use that ticket for authentication.
-\item
-  (Extend to cover ticket delegation here)
-\end{itemize}
+The ``HTTP Negoatiate'' extension was subsequently included in various open-source web browsers. It also has some support in the Apache web server, but this is generally used only to authenticate the user rather than for delegation purposes. The aim of this project is effectively to replicate Microsoft's setup using an open-source web framework (Django) in conjunction with the Apache web server and any client web browser which supports the Negotiate extension.
 
 \section{Implementation}
 
@@ -114,13 +140,51 @@ The basic workings of the protocol are as follows:
 A core aspect of this project is how a ticket can be \textit{delegated} from one server to another, such that the ticket used to log into the web app can be used to authenticate to another system.
 
 \subsubsection{Unconstrained Delegation}
+The traditional, and simplest, method for delegation is simply for the user $A$ to pass their ticket-granting ticket to the service $X$. $X$ can now behave as though it were $A$, and access any resources to which $A$ has access by simply presenting $A$'s ticket-granting ticket to the KDC and requesting a suitable service ticket.
+
+In MIT Kerberos, this is achieved by marking service $X$ with the \verb+ok-as-delegate+ flag, which ``hints the client that credentials can and should be delegated when authenticating to the service''\cite{KDC-conf-docs}.
+
+Despite seemingly being no better than $A$ simply giving a password to $X$ (so that $X$ can log in ``as'' $A$ when accessing $Y$), this scheme offers some advantages:
+
+\begin{itemize}
+\item
+  Kerberos tickets are time-limited, so if $A$ no longer wishes to allow $X$ to access resources, all $A$ has to do is wait for any delegated tickets which $X$ currently holds to expire (and not send any more). This contrasts with passwords which are valid indefinitely and may well not be straightforward to change in a complex corporate network.
+\item
+  Some limitations are placed on what can be done with the tickets. Although $X$ can use the TGT to get a service ticket to any other system $Y$ that $A$ can access, $Y$ does not automatically have the right to delegate this ticket further. If $Y$ does \textbf{not} have the \verb+ok-as-delegate+ flag set, then $X$ can \textit{access} $Y$ on $A$'s behalf but not allow $Y$ to perform actions for $A$ on some other server $Z$. If $Y$ is not well-trusted, this can be a significant benefit.
+\end{itemize}
+
+% Discuss NTLM fallbacks?
+
+While the second of these advantages is significant, it may still not offer enough access control over the network. In particular, $A$ cannot give $X$ the ability to delegate to $Y$ without also giving $X$ the ability to delegate to \textbf{any} other service which $A$ has access to. In many cases this would be too great a risk; it may well be desirable to allow $X$ to fetch $A$'s work documents from $Y$ to display them in a web app, but not to allow $X$ to retreive $A$'s financial records from another system $Z$ within the same Kerberos realm.
+
+In this case, constrained delegation offers a far more controllable method of only services to delegate tickets in particular ways, at the expense of a more complex setup for managing applications.
 
 \subsubsection{Constrained Delegation (S4U2proxy)}
-The \textit{Service for User to Proxy} (S4U2proxy) system is an extension to the basic Kerberos setup that allows one service to obtain a ticket to another service (on behalf of a principal) in a controlled manner. Once a service has been marked as ``permitted'' to obtain tickets for another, it can do so simply by making a request to the KDC.
+The \textit{Service for User to Proxy} (S4U2proxy) system is an extension to the basic Kerberos setup that allows one service $X$ to obtain a ticket to another service $Y$ (on behalf of a principal $A$) in a controlled manner. Once service $X$ has been marked as ``permitted'' to obtain tickets for service $Y$, it can do so simply by making a request to the KDC, without having any need to know the user's Kerberos password\cite{MS-s4u2}.
+
+Unlike with unconstrained delegation, here the ticket-granting ticket is not passed over to $X$; instead, $X$ is given a service ticket from $A$ as normal (to prove $A$'s identity and that $A$ wishes to connect to $X$). When $X$ needs to access $Y$ on behalf of $A$, $X$ \textit{submits the service ticket} to the KDC. If the permissions in the KDC are set appropriately, it is able to give $X$ a ticket to $Y$ on behalf of $A$.
 
 This requires a more complex setup of permission models in the KDC than simply a list of principals, since the KDC must now decide which services can delegate tickets to which others. The default back-end for MIT Kerberos does not support this, but moving the user data into an LDAP server and using this as the data source allows the relevant \texttt{krbAllowedToDelegateTo} permission to be set on the user\cite{KRB-DELEG}.
 
-Note that this is \textbf{not} the same as S4U2self, which (if configured) effectively allows a server to bypass Kerberos authentication completely and obtain a ticket on behalf of a client, rather than being given a ticket by the client as part of the authentication process.
+In addition to the advantages described above for unconstrained delegation, there are some further advantages here:
+
+\begin{itemize}
+\item
+  Access control can be almost completely customized. The system can now be set up so that $A$ can log into $X$ and have a Kerberos ticket delegated to $Y$, or log into $P$ and have a ticket delegated to $Q$, but not allow $X$ to delegate to $Q$. There is no simple set of ``privileged'' applications which are allowed to perform (all) delegation, but a customizable set of permissions between systems.
+\item
+  The number of powerful ticket-granting tickets that are stored in systems on the network is reduced. If an attacker gains access to $X$, the attacker will, at most, get service tickets for all users who have recently logged into $X$ (i.e.\ who have logged in and whose stored tickets have not yet expired), and delegated service tickets to the services which $X$ is allowed to. The attacker does not get a ticket-granting ticket to use on arbitrary applications.
+\end{itemize}
+
+\subsubsection{S4U2self}
+This is included for completeness (because of its similar name) although it is \textbf{not} a true method of delegating tickets.
+
+The Microsoft standard document for S4U2self\cite{MS-s4u2} states that:
+
+\begin{quote}
+  The S4U2self extension allows a service to obtain a service ticket to itself on behalf of a user. The user is identified to the KDC using the user's name and realm. Alternatively, the user might be identified based on the user's certificate.
+\end{quote}
+
+In effect, Kerberos authentication is bypassed completely and the server $X$ is able to get a ticket for $A$ simply by specifying $A$'s user name. This may be useful in some situations if not all clients can use Kerberos, but it offers a significantly weaker security model (since $X$ can now obtain service tickets for any user) and so if $X$ is compromised then records from all users can be gathered. As the aim of this project is to reduce the amount of trust placed in applications such as $X$, S4U2self is of no use and will not be considered further.
 
 \subsection{Implementing SQL Procedures}
 As one aspect of the project, the database server must be able to provide the correct set of records to each user without exposing the rest of the table. Since PostgreSQL does not offer the ability to selectively allow a user to query certain rows in a table, this can instead be acheived using stored procedures. However, these are not a standardised construct in SQL, and even within PostgreSQL there are multiple ways to achieve this.
@@ -156,11 +220,18 @@ AND p.owner = user;
 
 \bibitem{GDPR} Data Protection Act 2018: Section 157 \url{https://www.legislation.gov.uk/ukpga/2018/12/section/157/enacted} (accessed 10/02/2021)
 
+\bibitem{RFC4559} Microsoft Corporation (June 2006), \textit{SPNEGO-based Kerberos and NTLM HTTP Authentication in Microsoft Windows} (RFC 4559): \url{https://tools.ietf.org/html/rfc4559} (accessed 04/04/2021)
+
+\bibitem{KDC-conf-docs} MIT Kerberos documentation: \texttt{kdc.conf} \url{https://web.mit.edu/kerberos/www/krb5-devel/doc/admin/conf_files/kdc_conf.html} (accessed 05/04/2021)
+
+\bibitem{MS-s4u2} Microsoft Corporation (May 2014), \textit{Kerberos Protocol Extensions: Service for User and Constrained Delegation Protocol}: \url{https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-SFU/[MS-SFU]-140515.pdf} (accessed 05/04/2021)
+
+\bibitem{KRB-DELEG}  Kerberos: delegation and s4u2proxy (Simo Sorce, 12/02/2012) \url{https://ssimo.org/blog/id_011.html} (accessed 02/02/2021)
+
 \bibitem{postgres-SEC_DEF} PostgreSQL documentation: \texttt{CREATE FUNCTION} \url{https://www.postgresql.org/docs/current/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY} (accessed 22/02/2021)
 
 \bibitem{postgres-CREATE_RULE} PostgreSQL documentation: \texttt{CREATE RULE} \url{https://www.postgresql.org/docs/current/sql-createrule.html} (accessed 22/02/2021)
 
-\bibitem{KRB-DELEG}  Kerberos: delegation and s4u2proxy (Simo Sorce, 12/02/2012) \url{https://ssimo.org/blog/id_011.html} (accessed 02/02/2021)
 \end{thebibliography}
 
 \end{document}
