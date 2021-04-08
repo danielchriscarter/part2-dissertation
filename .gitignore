@@ -1,0 +1,8 @@
+# Exclude LaTeX temporary files
+*.aux
+*.log
+*.out
+*.dvi
+
+# Exclude editor-generated files
+*~
