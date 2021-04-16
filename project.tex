@@ -68,11 +68,11 @@ The following diagram represents an example of a typical current setup, and the 
 \subsection{Website Sign-on Systems}
 A further disadvantage of having a ``local'' system of checking passwords on each website is that users are then expected to memorise a large number of different passwords, since otherwise a compromise of the password database of one website would allow the attacker to impersonate users on any other website where they had used the same password. Especially where several websites are ``connected'' in some way (e.g.\ by all being associated with the same organisation), a \textit{single sign-on} system can offer significant benefits.
 
-A single sign-on (SSO) system generally consists of an authentication server, which collects a password (or some other security token) from the user and verifies the user's identity. When a user wishes to log on to a site which uses that SSO system, the user is redirected to the authentication server to log in. Assuming the login in successful, the user is redirected back to the site, along with some kind of unforgeable token to indicate that the authentication server has verified the user's identity.
+A single sign-on (SSO) system generally consists of an authentication server, which collects a password (or some other security token) from the user and verifies the user's identity. When a user wishes to log on to a site which uses that SSO system, the user is redirected to the authentication server to log in. Assuming the login is successful, the user is redirected back to the site, along with some kind of unforgeable token to indicate that the authentication server has verified the user's identity.
 
 Note that these steps only provide \textbf{authentication} of the user (i.e.\ that the person logging into the site is actually user $X$). \textbf{Authorisation} (i.e.\ checking whether user $X$ is entitled to access the site) must be done separately by the sites themselves.
 
-The University's Raven authentication service is an example of an SSO system; numerous similar systems exist (including OAuth2, which also has the ability to do a form of ``delegation'' to allow one server to request resources from another, on behalf of the user\cite{Oracle-OAuth2}.
+The University's Raven authentication service is an example of an SSO system; numerous similar systems exist (including OAuth2, which also has the ability to do a form of ``delegation'' to allow one server to request resources from another, on behalf of the user\cite{Oracle-OAuth2}).
 
 \subsection{Project Summary}
 This project aims to produce an authentication system for web applications, such that a user can authenticate to a web application using a Kerberos ticket and the web application can use this ticket to obtain the user's data from a database. The overall structure of the authentication process is as shown below, noting that the application itself does not have any other access means of accessing the database, so an attack such as the one depicted above cannot take place.
@@ -98,9 +98,9 @@ Since the same KDC can be used for many websites where the users all have a logi
 \end{tikzpicture}
 
 \subsection{Related Work}
-The original concept for this project was based on a system developed by Microsoft in IIS 5.0, which added a ``negotiate'' extension to the HTTP protocol for use with Kerberos. This standard is described in RFC 4559\cite{RFC4559} and described a system which allowed a user to log into a web application, from which a suitably equipped application could delegate the ticket to another system such as a database server. This permitted a user to log in to the website without needing a password, in effectively the same way as in the diagram above.
+The original concept for this project was based on a system developed by Microsoft in IIS 5.0, which added a ``negotiate'' extension to the HTTP protocol for use with Kerberos. This standard is described in RFC 4559\cite{RFC4559} and refers to a system which allowed a user to log into a web application, from which a suitably equipped application could delegate the ticket to another system such as a database server. This permitted a user to log in to the website without needing a password, in the same way as in the diagram above.
 
-The ``HTTP Negoatiate'' extension was subsequently included in various open-source web browsers. It also has some support in the Apache web server, but this is generally used only to authenticate the user rather than for delegation purposes. The aim of this project is effectively to replicate Microsoft's setup using an open-source web framework (Django) in conjunction with the Apache web server and any client web browser which supports the Negotiate extension.
+The ``HTTP Negotiate'' extension was subsequently included in various open-source web browsers. It also has some support in the Apache web server, but this is generally used only to authenticate the user rather than for delegation purposes. The aim of this project is effectively to replicate Microsoft's setup using an open-source web framework (Django) in conjunction with the Apache web server and any client web browser which supports the Negotiate extension.
 
 
 \section{Preparation}
@@ -151,7 +151,7 @@ This is valuable because it means that $X$ can access resources which ``belong''
 The core of this project is a Django web app, which is able to both perform the necessary setup steps to get the system working and (as a separate component) demonstrate the working of the system.
 
 \subsection{Kerberos Ticket Delegation}
-A core aspect of this project is how a ticket can be \textit{delegated} from one server to another, such that the ticket used to log into the web app can be used to authenticate to another system.
+A major aspect of this project is how a ticket can be \textit{delegated} from one server to another, such that the ticket used to log into the web app can be used to authenticate to another system.
 
 \subsubsection{Unconstrained Delegation}
 The traditional, and simplest, method for delegation is simply for the user $A$ to pass their ticket-granting ticket to the service $X$. $X$ can now behave as though it were $A$, and access any resources to which $A$ has access by simply presenting $A$'s ticket-granting ticket to the KDC and requesting a suitable service ticket.
@@ -171,7 +171,7 @@ Despite seemingly being no better than $A$ simply giving a password to $X$ (so t
 
 While the second of these advantages is significant, it may still not offer enough access control over the network. In particular, $A$ cannot give $X$ the ability to delegate to $Y$ without also giving $X$ the ability to delegate to \textbf{any} other service which $A$ has access to. In many cases this would be too great a risk; it may well be desirable to allow $X$ to fetch $A$'s work documents from $Y$ to display them in a web app, but not to allow $X$ to retreive $A$'s financial records from another system $Z$ within the same Kerberos realm.
 
-In this case, constrained delegation offers a far more controllable method of only services to delegate tickets in particular ways, at the expense of a more complex setup for managing applications.
+In this case, constrained delegation offers a far more controllable method of only allowing services to delegate tickets in particular ways, at the expense of a more complex setup for managing applications.
 
 \subsubsection{Constrained Delegation (S4U2proxy)}
 The \textit{Service for User to Proxy} (S4U2proxy) system is an extension to the basic Kerberos setup that allows one service $X$ to obtain a ticket to another service $Y$ (on behalf of a principal $A$) in a controlled manner. Once service $X$ has been marked as ``permitted'' to obtain tickets for service $Y$, it can do so simply by making a request to the KDC, without having any need to know the user's Kerberos password\cite{MS-s4u2}.
@@ -198,7 +198,7 @@ The Microsoft standard document for S4U2self\cite{MS-s4u2} states that:
   The S4U2self extension allows a service to obtain a service ticket to itself on behalf of a user. The user is identified to the KDC using the user's name and realm. Alternatively, the user might be identified based on the user's certificate.
 \end{quote}
 
-In effect, Kerberos authentication is bypassed completely and the server $X$ is able to get a ticket for $A$ simply by specifying $A$'s user name. This may be useful in some situations if not all clients can use Kerberos, but it offers a significantly weaker security model (since $X$ can now obtain service tickets for any user) and so if $X$ is compromised then records from all users can be gathered. As the aim of this project is to reduce the amount of trust placed in applications such as $X$, S4U2self is of no use and will not be considered further.
+In effect, Kerberos authentication is bypassed completely and the server $X$ is able to get a ticket for $A$ simply by specifying $A$'s user name. This may be useful in some situations if not all clients can use Kerberos, but it offers a significantly weaker security model (since $X$ can now obtain service tickets for any user) and so if $X$ is compromised then records from all users can be gathered. As the aim of this project is to reduce the amount of trust placed in applications such as $X$, S4U2self is not relevant to this goal and will not be considered further.
 
 \subsection{SQL Access Control}
 As one aspect of the project, the database server must be able to provide the correct set of records to each user without exposing the rest of the table. Since PostgreSQL does not offer the ability to selectively allow a user to query certain rows in a table, this can instead be acheived using stored procedures. However, these are not a standardised construct in SQL, and even within PostgreSQL there are multiple ways to achieve this.
