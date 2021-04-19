@@ -150,8 +150,15 @@ This is valuable because it means that $X$ can access resources which ``belong''
 \subsection{System Structure}
 The core of this project is a Django web app, which is able to both perform the necessary setup steps to get the system working and (as a separate component) demonstrate the working of the system.
 
+\subsection{Kerberos Backend}
+The KDC and related Kerberos backend services are a significant component of the system, and form part of the \textit{trusted computing base} of the setup (i.e.\ the parts of the system which, if compromised, could allow the security of the whole system to be compromised). Although not actually requiring any new software development (since in a real situation this backend would already exist, for instance as an Active Directory server), arranging a suitable test setup with the right permissions was required for the project.
+
+\subsubsection{Basic MIT Kerberos Backend}
+
+\subsubsection{Connecting to an LDAP Server}
+
 \subsection{Kerberos Ticket Delegation}
-A major aspect of this project is how a ticket can be \textit{delegated} from one server to another, such that the ticket used to log into the web app can be used to authenticate to another system.
+Another major aspect of this project is how a ticket can be \textit{delegated} from one server to another, such that the ticket used to log into the web app can be used to authenticate to another system.
 
 \subsubsection{Unconstrained Delegation}
 The traditional, and simplest, method for delegation is simply for the user $A$ to pass their ticket-granting ticket to the service $X$. $X$ can now behave as though it were $A$, and access any resources to which $A$ has access by simply presenting $A$'s ticket-granting ticket to the KDC and requesting a suitable service ticket.
@@ -224,6 +231,38 @@ WHERE f.id = p.file_id
 AND p.owner = user;
 \end{verbatim}
 
+\subsection{Kerberos access to PostgreSQL}
+Although PostgreSQL includes Kerberos-based authentication via the GSSAPI framework\cite{postgres-GSSAPI}, the client which connects it to Django (and to most other applications) currently does not offer a choice of which ticket to use and simply takes a stored ticket from the system's default \texttt{ccache} location. This is obviously unsatisfactory in the case of an application where many user's tickets will be stored and the application must use the appropriate ticket each time, and so I have added a patch to the PostgreSQL client library to perform this.
+
+Django's interactions with PostgreSQL are achieved using the \texttt{psycopg} library, which forms the basis for the PostgreSQL backend which comes with Django. However, much of the actual library functionality is simply a wrapper around the C-based \texttt{libpq} library, which is provided as part of PostgreSQL and manages the actual interaction with the database server.
+
+% TODO: Some more thorough coverage of the Python implementation
+
+To specify the ticket which will be used for a Kerberos-based (GSSAPI) connection, the MIT Kerberos API provides a \verb+gss_krb5_ccache_name+ function which allows the user to specify a credential cache to use. The ``core'' addition to the \texttt{libpq} library is therefore simply a call to this function at the appropriate point, specifying the location of the credential cache which is to be used:
+
+\begin{verbatim}
+if (ccache_name != NULL) {
+        gss_krb5_ccache_name(&minor, ccache_name, NULL);
+}
+\end{verbatim}
+
+As well as this, some further changes are needed to store the \texttt{ccache} name provided by the user with the rest of the connection information, until it is actually needed at the point of initiating the connection. Therefore, an additional field has also been added to the \texttt{PGconn} structure by virtue of adding an option in the \texttt{PQconninfoOptions} array:
+
+% TODO: A fuller explanation here!
+
+\begin{verbatim}
+#ifdef ENABLE_GSS
+       {"ccache_name", NULL, NULL, NULL,
+               "Credential-cache-name", "", 64,
+       offsetof(struct pg_conn, ccache_name)},
+#endif
+\end{verbatim}
+
+The \verb+#ifdef+ macro allows the compiler of PostgreSQL to choose (at compile time) whether Kerberos support will be included in the build or not.
+
+Note that the public API does not need to change at all: since the user passes in a set of key-value pairs specifying connection options, the only change made here is to recognise an additional option in this set (via the \verb+ccache_name+ shown above). If the user does not specify this option, its value defaults to \texttt{NULL}, and in this case it is simply ignored and PostgreSQL works as normal (because of the null check around the \verb+gss_krb5_ccache_name+ call shown above.
+
+
 \section{Evaluation}
 
 \section{Conclusion}
@@ -248,6 +287,7 @@ AND p.owner = user;
 
 \bibitem{postgres-CREATE_RULE} PostgreSQL documentation: \texttt{CREATE RULE} \url{https://www.postgresql.org/docs/current/sql-createrule.html} (accessed 22/02/2021)
 
+\bibitem{postgres-GSSAPI} PostgreSQL documentation: GSSAPI Authentication \url{https://www.postgresql.org/docs/13/gssapi-auth.html} (accessed 19/04/2021)
 \end{thebibliography}
 
 \end{document}
