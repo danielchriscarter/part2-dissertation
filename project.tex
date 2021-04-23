@@ -240,17 +240,14 @@ The Microsoft standard document for S4U2self\cite{MS-s4u2} states that:
 In effect, Kerberos authentication is bypassed completely and the server $X$ is able to get a ticket for $A$ simply by specifying $A$'s user name. This may be useful in some situations if not all clients can use Kerberos, but it offers a significantly weaker security model (since $X$ can now obtain service tickets for any user) and so if $X$ is compromised then records from all users can be gathered. As the aim of this project is to reduce the amount of trust placed in applications such as $X$, S4U2self is not relevant to this goal and will not be considered further.
 
 \subsection{SQL Access Control}
-As one aspect of the project, the database server must be able to provide the correct set of records to each user without exposing the rest of the table. Since PostgreSQL does not offer the ability to selectively allow a user to query certain rows in a table, this can instead be acheived using stored procedures. However, these are not a standardised construct in SQL, and even within PostgreSQL there are multiple ways to achieve this.
+A core aspect of this project is the ability to shift access control from the web app itself to the SQL server. Most SQL server applications contain permissions models which allow selective access to data, and there are often a number of ways of achieveing this (especially since they are not very well standardised across SQL implementations). As this project specifically uses PostgreSQL, I evaluated a number of supported methods to determine how best to implement the security protocol.
 
 \subsubsection{\texttt{SECURITY DEFINER} functions}
 A PostgreSQL function with \texttt{SECURITY DEFINER} in the signature runs ``as'' the user creating the function, regardless of who executes it\cite{postgres-SEC_DEF} (in a similar way to how the \texttt{setuid} bit works in Unix). This allows the database owner to create a function which can read the whole table and when run, perform some check based on the user calling it and return appropriate results.
 
-This approach requires some caution since the \texttt{SECURITY DEFINER} property also redefines the \verb+current_user+ variable (which normally contains the username of the user executing a query) to the user who defined the function, although this can be worked around using \verb+session_user+ instead. It is also not as easily integratable into frameworks such as Django, which are designed to execute queries on tables rather than (effectively) making function calls to an API.
+This approach requires some caution since the \texttt{SECURITY DEFINER} property also redefines the \verb+current_user+ variable (which normally contains the username of the user executing a query) to the user who defined the function, although this can be worked around using \verb+session_user+ instead. Once this is taken into account, such a procedure can be used to return files where the current user has an appropriate entry in a permission table.
 
-\subsubsection{Use of \texttt{ON SELECT} to redefine selection}
-PostgreSQL also allows rules to be created which effectively redefine actions on tables. For example, a rule could be used to replace the default \texttt{SELECT} rule on the table storing file information with one that checked user permissions.
-
-However, this is likely to introduce unnecessary complexity (particularly with ensuring that administrators can still access data as necessary, for example). For these reasons, the PostgreSQL documentation considers it ``better style to write a \texttt{CREATE VIEW} command than to create a real table and define an \texttt{ON SELECT} rule for it''\cite{postgres-CREATE_RULE}.
+While very flexible, this approach is is not easily integratable into frameworks such as Django, which are designed to execute queries on tables rather than (effectively) making function calls to an API. Since the goal is to allow the user to set up a Django web app which works using existing models, this setup is non-ideal.
 
 \subsubsection{SQL views}
 These effectively allow a new table to be created out of a view over an existing table. Using syntax such as the following, it is therefore possible to construct a new table which only has the calling user's files visible; the user can then be granted access to this view (which automatically selects files based on their own username) and does not then need to have any access to the original table. For web application purposes, it can be queried just like any other table.
@@ -262,6 +259,56 @@ FROM files_file f, files_permission p
 WHERE f.id = p.file_id
 AND p.owner = user;
 \end{verbatim}
+
+While less significant than for \texttt{SECURITY DEFINER} functions, views also introduce difficulties for interfacing with Django since each database table now needs to have two entries in the Django model setup (one for the table itself and one for the view). Using abstract classes and inheritance allows some reduction in the amount of duplication, but this is still non-ideal.
+
+\subsubsection{Use of \texttt{ON SELECT} to redefine selection}
+PostgreSQL also allows rules to be created which effectively redefine actions on tables. For example, a rule could be used to replace the default \texttt{SELECT} rule on the table storing file information with one that checked user permissions.
+
+However, this is likely to introduce unnecessary complexity (particularly with ensuring that administrators can still access data as necessary, for example). For these reasons, the PostgreSQL documentation considers it ``better style to write a \texttt{CREATE VIEW} command than to create a real table and define an \texttt{ON SELECT} rule for it''\cite{postgres-CREATE_RULE}.
+
+\subsubsection{Row-level security}
+The final method considered, and the one which turned out to be best-suited to this problem, was PostgreSQL's row-level security constructions. These allow policies (defined by the database owner) to determine who can view which rows in the database.
+
+There are two forms of policy, which are applied in different cicumstances\cite{postgres-policy}:
+\begin{itemize}
+\item
+  \texttt{USING} policies, which work on existing rows to determine whether users are allowed to view and/or update the contents of a row. This is used for the main data tables (since the main concern is the confidentiality of file data), where the following lines of code allow users to view and update files which they have permission records for:
+
+\begin{verbatim}
+# Enable row-level security on the relevant table
+cursor.execute("""ALTER TABLE %s ENABLE ROW LEVEL SECURITY"""
+        % (source_table))
+# Only allow users to view and edit files which they have permission to see
+cursor.execute("""CREATE POLICY %s_view ON %s
+USING (%s IN (SELECT %s FROM %s WHERE %s = session_user))"""
+        % (source_table, source_table, source_column, perm_column, perm_table,
+           owner_column))
+\end{verbatim}
+
+  With a \texttt{USING} policy, a row which fails the policy is not visible to the user and so cannot be accessed.
+
+\item
+  \texttt{WITH CHECK} policies, which are designed to protect insertion of new rows. These are more suited to protecting the integrity of data (by stopping unauthorised additions) and so are used in this application for the permission tables. Since an attacker could otherwise insert permissions to allow them to read arbitrary files, this is another critical part of the security model:
+
+\begin{verbatim}
+# Also enable row-level security on the permissions table
+cursor.execute("""ALTER TABLE %s ENABLE ROW LEVEL SECURITY"""
+        % (perm_table))
+# Only allow users to set permissions where they already have access to that file
+cursor.execute("""CREATE POLICY %s_view ON %s FOR INSERT
+WITH CHECK (%s IN (SELECT %s FROM %s WHERE %s = session_user))"""
+        % (perm_table, perm_table, perm_column, perm_column, perm_table,
+           owner_column))
+\end{verbatim}
+
+  A further special-case policy allows newly created files (with no current owner) to have permissions assigned. With this type of policy, an error is generated if a user tries to create entries without the authority to do so.
+
+\end{itemize}
+
+Note that the table names above are separately verified by the application before being placed into these database queries to avoid SQL injection being directly possible here, but also that logging in as the database administrator to perform these types of actions inherently involves having full access to the database and so it is impossible to remove all SQL injection risks if the application is compromised \textbf{while} the set-up phase is going on.
+
+The row-level security model runs in parallel with the standard SQL permissions model and both systems must allow access for an action to be allowed. Thus, to only allow read-only access to selected rows, a \texttt{USING} policy can be set up to determine row accesses, and the user concerned only granted \texttt{SELECT} (and not \texttt{UPDATE}) access to the table. This is employed in the application to restrict malicious modifications to permission entries.
 
 \subsection{Kerberos access to PostgreSQL}
 Although PostgreSQL includes Kerberos-based authentication via the GSSAPI framework\cite{postgres-GSSAPI}, the client which connects it to Django (and to most other applications) currently does not offer a choice of which ticket to use and simply takes a stored ticket from the system's default \texttt{ccache} location. This is obviously unsatisfactory in the case of an application where many user's tickets will be stored and the application must use the appropriate ticket each time, and so I have added a patch to the PostgreSQL client library to perform this.
@@ -320,6 +367,8 @@ Note that the public API does not need to change at all: since the user passes i
 \bibitem{postgres-SEC_DEF} PostgreSQL documentation: \texttt{CREATE FUNCTION} \url{https://www.postgresql.org/docs/current/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY} (accessed 22/02/2021)
 
 \bibitem{postgres-CREATE_RULE} PostgreSQL documentation: \texttt{CREATE RULE} \url{https://www.postgresql.org/docs/current/sql-createrule.html} (accessed 22/02/2021)
+
+\bibitem{postgres-policy} PostgreSQL documentation: \texttt{CREATE POLICY} \url{https://www.postgresql.org/docs/13/sql-createpolicy.html} (accessed 23/04/2021)
 
 \bibitem{postgres-GSSAPI} PostgreSQL documentation: GSSAPI Authentication \url{https://www.postgresql.org/docs/13/gssapi-auth.html} (accessed 19/04/2021)
 \end{thebibliography}
