@@ -174,6 +174,12 @@ Since the same KDC can be used for many websites where the users all have a logi
 \subsection{System Structure}
 The core of this project is a Django web app, which is able to both perform the necessary setup steps to get the system working and (as a separate component) demonstrate the working of the system.
 
+TODO: Overview of repository structure
+
+In keeping with the principle that the web app should simply be a ``view'' onto the main database (and also the limited privileges that the app itself has for writing to the database), Django uses a separate database for recording session information and associated ``housekeeping'' data, but not any of the actual records which have access control applied to them.
+
+For ease of setup (since this is not a significant aspect of the project), this was done using a simple SQLite database, although the setup did require a Django \texttt{AuthRouter} to make sure that queries are always directed to the appropriate database: see \hyperref[sec:appendix1]{Appendix 1} for more details and code.
+
 \subsection{SPNEGO}
 SPNEGO (Simple and Protected GSSAPI Negotiation Mechanism) is a mechanism which uses a single packet exchange to itentify a suitable protocol to authenticate the user with. In practice, it is usually used with either NTLM (a challenge-response protocol, whose cryptography can be easily broken using current technology and so which is vulnerable to attack) or Kerberos, and the server can specify which protocols it is willing to accept.
 
@@ -310,6 +316,36 @@ Note that the table names above are separately verified by the application befor
 
 The row-level security model runs in parallel with the standard SQL permissions model and both systems must allow access for an action to be allowed. Thus, to only allow read-only access to selected rows, a \texttt{USING} policy can be set up to determine row accesses, and the user concerned only granted \texttt{SELECT} (and not \texttt{UPDATE}) access to the table. This is employed in the application to restrict malicious modifications to permission entries.
 
+\subsection{The database setup application}
+As the most significant component of software produced for this project, the database setup application is designed to allow a website administrator to easily set up SQL permissions such that other Django applications (including the file browser example app) work with minimal changes.
+
+This application first needs to gather information from the user to allow a ``matching'' of data and permission tables (i.e.\ to determine which table holds permission records for a given table of data). This is clearly dependent on where there are appropriate table relationships already set up (a permission table must contain a foreign key to the data table), and PostgreSQL exposes this information via an internal \verb+information_schema+ table.
+
+Therefore, executing the following query on a given model (using the \verb+model_data+ paramaters which are incorporated into the query) provides a set of candidate permission tables where such a foreign key exists:
+
+\begin{verbatim}
+cursor.execute("""SELECT dst.table_name, dst.column_name
+    FROM information_schema.constraint_column_usage src,
+         information_schema.key_column_usage dst,
+         information_schema.table_constraints constraints
+    WHERE src.constraint_name = constraints.constraint_name
+    AND constraints.constraint_name = dst.constraint_name
+    AND constraints.constraint_type = 'FOREIGN KEY'
+    AND src.table_name = %s
+    AND src.column_name = %s""",
+    [model_data['table'], model_data['primary_key']])
+\end{verbatim}
+
+The application then performs a further query to the \verb+information_schema+ table to identify columns in these candidate tables which could be used to store the user's identity in a permission element. Because Django itself has no knowledge of the database's users, these are simply stored as string values (\texttt{character} or \texttt{character varying} in PostgreSQL nomenclature) in the database:
+
+\begin{verbatim}
+cursor.execute("""SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = %s
+    AND data_type LIKE 'character%%'""",
+    [table])
+\end{verbatim}
+
 \subsection{Kerberos access to PostgreSQL}
 Although PostgreSQL includes Kerberos-based authentication via the GSSAPI framework\cite{postgres-GSSAPI}, the client which connects it to Django (and to most other applications) currently does not offer a choice of which ticket to use and simply takes a stored ticket from the system's default \texttt{ccache} location. This is obviously unsatisfactory in the case of an application where many user's tickets will be stored and the application must use the appropriate ticket each time, and so I have added a patch to the PostgreSQL client library to perform this.
 
@@ -372,5 +408,57 @@ Note that the public API does not need to change at all: since the user passes i
 
 \bibitem{postgres-GSSAPI} PostgreSQL documentation: GSSAPI Authentication \url{https://www.postgresql.org/docs/13/gssapi-auth.html} (accessed 19/04/2021)
 \end{thebibliography}
+
+\section*{Appendix 1: Django database router}
+\label{sec:appendix1}
+The code below shows the routing process for Django to determine which database to use for a given type of request:
+
+\begin{verbatim}
+class FileDBRouter:
+    APP_LABEL = 'files'
+
+    DATA_DB = settings.DELEG_DATABASE
+    DEFAULT_DB = 'default'
+
+    def db_for_read(self, model, **hints):
+        """
+        File access goes to 'data' database, otherwise default
+        """
+        if model._meta.app_label == self.APP_LABEL:
+            return self.DATA_DB
+        return self.DEFAULT_DB
+
+    def db_for_write(self, model, **hints):
+        """
+        File access goes to 'data' database, otherwise default
+        """
+        if model._meta.app_label == self.APP_LABEL:
+            return self.DATA_DB
+        return self.DEFAULT_DB
+
+    def allow_relation(self, obj1, obj2, **hints):
+        """
+        Only allow relations within a database, not across multiple databases
+        """
+        return ((obj1._meta.app_label == self.APP_LABEL) ==
+                (obj2._meta.app_label == self.APP_LABEL))
+
+    def allow_migrate(self, db, app_label, model_name=None, **hints):
+        """
+        Only put files into the 'data' database, and everything else into the
+        'default' database
+        """
+        if (app_label == self.APP_LABEL) and (db == self.DATA_DB):
+            return True
+        if  (app_label != self.APP_LABEL) and (db != self.DATA_DB):
+            return True
+        return False
+\end{verbatim}
+
+The main database (\verb+DATA_DB+, whose name is stored in the general Django settings file as it is also required in the database setup procedure) contains the data to be protected by PostgreSQL access control. The ``default'' database (\verb+DEFAULT_DB+) is used for all other records (primarily web app session information), and so this router directs queries from the file browser app to the PostgreSQL database, and other data which is internal to the web app to the other database.
+
+Once this router is in place, the routing is transparent to the web app, which simply needs to use the Django models classes as normal. The router can be overridden in an application if necessary, and this is done on the \verb+managedb+ pages to allow setup of the database permissions.
+
+(The code above is loosely based on several examples given in the Django documentation at \url{https://docs.djangoproject.com/en/3.1/topics/db/multi-db/}.)
 
 \end{document}
