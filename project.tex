@@ -88,6 +88,8 @@ Apart from having a Kerberos ticket in the first place, this is set up to be com
 
 As a demonstration of this in practice, the project includes an example file-browser application that performs all authentication and authorisation via Kerberos tickets and database permissions, rather than implementing the security in the web app.
 
+While most of the library functionality to acheive this was already existent in some form, the actual completion of the project involved evaluating possible solutions and technologies for each part of the project, and adding functionality to libraries where this was required. The project clearly also involved building the web application itself in order to provide a simple setup interface and demonstrate the correct working of the system.
+
 \subsection{Related Work}
 The core Kerberos system and its extensions are described in a series of RFCs, several of which are relevant to this project:
 
@@ -177,6 +179,36 @@ Since the same KDC can be used for many websites where the users all have a logi
   \draw [arrow, bend left] (database) edge node[left] {\parbox{0.4\textwidth}{\hfill Here is Alice's data}} (webserver);
   \draw [arrow, bend left] (webserver) edge node[left] {\parbox{0.4\textwidth}{\hfill Here is your data}} (user);
 \end{tikzpicture}
+
+\subsection{Requirements Analysis}
+There are three broad components to the setup of this project: the web server, the web application framework and the database.
+
+Of the available open-source web server frameworks, Apache and nginx are the two which receive significant use. Both have some form of existing Kerberos support and so this project could probably have been completed using either. As Apache is the only one of the two with which I had any previous experience, I decided to continue using it following some experimentation over the summer (see ``starting point'' below). Apache's module system is also more flexible than nginx's, which offers advantages in this project.
+
+For the web application framework there are many more options, from a basic setup with PHP files to more full-featured systems. Although there would likely have been many good candidates, I selected Django as a widely-used framework which offers the required features (and is written in Python, which is a language that I was previously familiar with).
+
+Finally, there are also a number of possible options for the SQL server running the database. Although my previous SQL experience was primarily using mySQL, PostgreSQL offers more advanced functionality in a number of areas (including flexibility in table security options) and so offers advantages for this project. It also offers built-in support for authenticating to the database using a Kerberos ticket, which is clearly of use here.
+
+\subsubsection{Source Code Management}
+For the Django directory itself, running it as a git repository with commits pushed to GitHub provides both version control and a backup of the directory in use. This was also checked out into a separate folder on my PC which was backed up to Dropbox, to provide an additional layer of backup.
+
+Since the main development was completed in virtual machines which would have been time-consuming to set up again if lost, I also took backups of the whole VM setup to an external hard drive during development. In the event of a failure, I could have restored these backups to a replacement PC to continue working on them.
+
+\subsubsection{Testing Methodology}
+Since the core aims of the project are to provide a secure system, this can be most appropriately tested using a security analysis of the types of vulnerabilities (such as SQL injection) which it is vulnerable to, and how this compares with other systems in current use. As the project also has the potential to result in slower performance than existing systems (due to extra authentication overheads), evaluation of performance and comparing it with a non-Kerberos based system is also a component of evaluating the system.
+
+\subsection{Starting Point}
+(N.B.\ the text below is a slightly modified version of the starting point submitted in my project proposal)
+
+Kerberos support for Apache already exists (via the \verb+mod_auth_gssapi+ module), and this includes some ability to delegate tickets although with drawbacks (principally that the tickets to be delegated are placed in a directory which is accessible to any process running as the webserver user). Django similarly includes Kerberos extensions (such as \verb+django-gssapi+), but these do not directly offer any delegation facilities and are ultimately not really relevant to this project since Django does not need to participate in Kerberos authentication other than passing on login information. As a starting point, I have investigated these and built on the functionality which they already offer.
+
+PostgreSQL already has support for Kerberos and this can be used as a back-end database system.
+
+I previously had some knowledge of authentication systems and general security topics from the 1B Security course, and of C programming from the 1B Programming in C and C++ course. I have also had general experience with web application setup (although not the specific technologies involved here, which required learning how Django works and the syntax of its templating language) through the 1B Group Project and work done outside the Tripos.
+
+In addition, over the summer vacation I did some experimentation with Kerberos authentication to set up a virtual machine using the existing Kerberos functionality of Apache and PostgreSQL (logging in separately to the two applications without any delegation of tickets).
+
+The Django documentation\cite{Django-docs} was used as a reference and guide throughout development, including using (some of) the provided tutorial to set up the basic web app before being integrated with the Kerberos authentication setup.
 
 
 \section{Implementation}
@@ -511,6 +543,8 @@ Note that the public API does not need to change at all: since the user passes i
 \bibitem{RFC4178} Larry Zhu et.\ al.\ \textit{The Simple and Protected Generic Security Service Application Program Interface (GSS-API) Negotiation Mechanism} (RFC 4178): \url{https://tools.ietf.org/html/rfc4178} (accessed 26/04/2021)
 
 \bibitem{RFC4559} Karthik Jaganathan, Larry Zhu and John Brezak (June 2006), \textit{SPNEGO-based Kerberos and NTLM HTTP Authentication in Microsoft Windows} (RFC 4559): \url{https://tools.ietf.org/html/rfc4559} (accessed 04/04/2021)
+
+\bibitem{Django-docs} Django documentation (including the sub-pages linked from here) \url{https://docs.djangoproject.com/en/3.1/} (accessed 27/04/2021)
 
 \bibitem{KDC-conf-docs} MIT Kerberos documentation: \texttt{kdc.conf} \url{https://web.mit.edu/kerberos/www/krb5-devel/doc/admin/conf_files/kdc_conf.html} (accessed 05/04/2021)
 
