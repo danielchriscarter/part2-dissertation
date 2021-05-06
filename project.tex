@@ -1,6 +1,6 @@
 \documentclass{report}
 
-\usepackage{hyperref}
+\usepackage[pdfusetitle]{hyperref}
 \usepackage[a4paper, margin=1in]{geometry}
 \usepackage{cite}
 \usepackage{upquote}
@@ -168,214 +168,6 @@ In addition to use for authentication, Kerberos supports a method of \textit{del
 
 This is valuable because it means that $X$ can access resources which ``belong'' to $A$, without $X$ needing to have direct access to $Y$. This means that less trust in $X$ is needed (since it does not need privileged access to $Y$), and so the types of attacks discussed above become much less likely.
 
-\section{Project Structure}
-
-\subsection{Overall Structure}
-The overall structure of the authentication process is as shown below.
-
-Since the same KDC can be used for many websites where the users all have a login to the same Kerberos realm, the system also functions as a single sign-on system (using the Kerberos ticket as proof of identity). As detailed in sections 2 and 3, this means that none of the individual websites need to be given access to the user's password, and that that they are not able to arbitrarily impersonate the user on other systems. The possibility of delegating tickets in a controlled manner means that the website shown can fetch data from the database on behalf of the user, but it cannot get any data from other systems which it has not been authorised to access. It also cannot get data on behalf of users for whom it does not hold a live Kerberos ticket (so there is no way to access the records of users who have not used the system for a time interval at least as long as the expiry time of their tickets).
-
-\begin{center}
-  \begin{tikzpicture}[node distance=2.2cm]
-    \node (user) [plain] {User};
-    \node (webserver) [untrusted, below of=user, yshift=-1cm] {Website};
-    \node (database) [trusted, below of=webserver] {Database};
-    \node (kdc) [trusted, left of=user, xshift=-2cm] {KDC};
-
-    \draw [arrow, bend right] (user) edge node[above, xshift=2.5cm] {\parbox{0.5\textwidth}{\textcircled{1} \\ Username: \texttt{alice} \\ Password: \texttt{*****}}} (kdc);
-
-    \draw [arrow, bend right] (kdc) edge node[above, yshift=-0.5cm] {\textcircled{2} Kerberos ticket} (user);
-
-    \draw [arrow, bend right] (user) edge node[left, yshift=-0.6cm] {\textcircled{3} Kerberos ticket} (webserver);
-
-    \draw [arrow, bend right] (webserver) edge node[left] {\parbox{0.3\textwidth}{\raggedright \textcircled{4} \texttt{SELECT} the records which this ticket can access (\textbf{delegated ticket} of Alice)}} (database);
-
-    \draw [arrow, bend right] (database) edge node[right] {\textcircled{5} Here is Alice's data} (webserver);
-    \draw [arrow, bend right] (webserver) edge node[right] {\textcircled{6} Here is your data} (user);
-  \end{tikzpicture}
-\end{center}
-
-Note that, unlike in the diagram shown in \hyperref[sec:sql_injection]{Section 1.1.1}, the web application no longer has to be part of the trusted computing base; it does merely passes on the Kerberos ticket which a user has provided and does not have any other method of accessing the data in the database. This means that an attack such as the one depicted in the previous diagram cannot take place.
-
-\subsection{Demonstration Web Application}
-The project demonstrates a web application that uses Kerberos authentication and delegation to fetch data from a database and display it to the user, in the form of a basic file browser-type application. Django makes use of a structure based on \textit{models} which correspond roughly to classes in the object-oriented programming model (and are represented by Python classes in the Django configuration), with each model being able to have different attributes (which are set up as member variables of the class). When stored in a database, each model is a table, with each object of a model being a row in that table and each attribute being a column.
-
-In the example web app, the models are files and directories, plus associated tables to hold access permissions for both files and directories. The database model can be represented in the following entity-relationship diagram:
-
-\begin{tikzpicture}[node distance=3cm]
-  \node[entity] (file) {File}
-       [grow=up, sibling distance=2cm]
-       child {node[attribute, left of=file] {id}}
-       child {node[attribute] {name}}
-       child {node[attribute] {contents}}
-       child {node[attribute] {owner}};
-
-  \node[relationship, right of=file, align=center] (file_location) {File \\ location};
-
-  \node[entity, right of=file_location] (directory) {Directory}
-       [grow=up, sibling distance=2cm]
-       child {node[attribute] {id}}
-       child {node[attribute] {name}}
-       child {node[attribute] {owner}};
-
-  \node[relationship, right of=directory, align=center] (directory_parent) {Directory \\ parent};
-
-  \node[relationship, below of=file, align=center] (file_permission) {File \\ permission};
-
-  \node[entity, below of=file_permission, align=center] (file_permission_entry) {File Permission \\ Entry}
-       [sibling distance=2cm]
-       child {node[attribute] {id}}
-       child {node[attribute] {owner}};
-
-  \node[relationship, below of=directory, align=center] (directory_permission) {Directory \\ permission};
-
-  \node[entity, below of=directory_permission, align=center] (directory_permission_entry) {Directory \\ Permission Entry}
-       [sibling distance=2cm]
-       child {node[attribute] {id}}
-       child {node[attribute] {owner}};
-
-  \path (file) edge node [above] {$n$} (file_location);
-  \path (file_location) edge node [above] {1} (directory);
-
-  \path (directory) edge node [above] {$n$} (directory_parent);
-  \path (directory_parent) edge[bend left] node [below] {1} (directory);
-
-  \path (file) edge node [left] {1} (file_permission);
-  \path (file_permission) edge node [left] {$n$} (file_permission_entry);
-
-  \path (directory) edge node [left] {1} (directory_permission);
-  \path (directory_permission) edge node [left] {$n$} (directory_permission_entry);
-\end{tikzpicture}
-
-\subsubsection{Database Setup Application}
-It also includes a component which performs the necessary setup tasks (setting up SQL permissions), so that all that is required for the user of the application is to:
-\begin{itemize}
-\item
-  Set up a Django app with the appropriate models
-\item
-  Run the normal Django \texttt{migrate} command to set up the database
-\item
-  Use the web interface (created as part of this project) to set up appropriate access controls
-\end{itemize}
-
-\section{Requirements Analysis}
-There are three broad components to the setup of this project: the web server, the web application framework and the database.
-
-Of the available open-source web server frameworks, Apache and nginx are two which receive significant use. Both have some form of existing Kerberos support and so this project could probably have been completed using either. As Apache is the only one of the two with which I had any previous experience, I decided to continue using it following some experimentation over the summer (see ``starting point'' below). Apache's module system is also more flexible than nginx's, which offers advantages in this project.
-
-For the web application framework there are many more options, from a basic setup with PHP files to more full-featured systems. Although there would likely have been many good candidates, I selected Django as a widely-used framework which offers the required features (and is written in Python, which is a language that I was previously familiar with).
-
-Finally, there are also a number of possible options for the SQL server running the database. Although my previous SQL experience was primarily using mySQL, PostgreSQL offers more advanced functionality in a number of areas (including flexibility in table security options) and so offers advantages for this project. It also offers built-in support for authenticating to the database using a Kerberos ticket, which is clearly of use here.
-
-\subsection{Source Code Management}
-For the Django directory itself, running it as a git repository with commits pushed to GitHub provides both version control and a backup of the directory in use. This was also checked out into a separate folder on my PC which was backed up to Dropbox, to provide an additional layer of backup.
-
-Since the main development was completed in virtual machines which would have been time-consuming to set up again if lost, I also took backups of the whole VM setup to an external hard drive during development. In the event of a failure, I could have restored these backups to a replacement PC to continue working on them.
-
-\subsection{Testing Methodology}
-Since the core aims of the project are to provide a secure system, this can be most appropriately tested using a security analysis of the types of vulnerabilities (such as SQL injection) which it is vulnerable to, and how this compares with other systems in current use. As a na\"ive implementation of the project also has the potential to result in slower performance than existing systems (due to extra authentication overheads), evaluation of performance and comparing it with a non-Kerberos based system is also a component of evaluating the system.
-
-\section{Starting Point}
-(N.B.\ the text below is a slightly modified version of the starting point submitted in my project proposal)
-
-Kerberos support for Apache already exists (via the \verb+mod_auth_gssapi+ module), and this includes some ability to delegate tickets although with drawbacks (principally that the tickets to be delegated are placed in a directory which is accessible to any process running as the webserver user). Django similarly includes Kerberos extensions (such as \verb+django-gssapi+), but these do not directly offer any delegation facilities and are ultimately not really relevant to this project since Django does not need to participate in Kerberos authentication other than passing on login information. As a starting point, I have investigated these and built on the functionality which they already offer.
-
-PostgreSQL already has support for Kerberos and this can be used as a back-end database system.
-
-I previously had some knowledge of authentication systems and general security topics from the 1B Security course, and of C programming from the 1B Programming in C and C++ course. I have also had general experience with web application setup (although not the specific technologies involved here, which required learning how Django works and the syntax of its templating language) through the 1B Group Project and work done outside the Tripos.
-
-In addition, over the summer vacation I did some experimentation with Kerberos authentication to set up a virtual machine using the existing Kerberos functionality of Apache and PostgreSQL (logging in separately to the two applications without any delegation of tickets).
-
-The Django documentation\cite{Django-docs} was used as a reference and guide throughout development, including using (some of) the provided tutorial to set up the basic web app before being integrated with the Kerberos authentication setup.
-
-
-\chapter{Implementation}
-
-\section{System Structure and Repository Overview}
-The core of this project is a Django web app, which is able to both perform the necessary setup steps to get the system working and (as a separate component) demonstrate the working of the system.
-
-The structure of the directories involved is as shown below. The basic directory layout is as produced by the Django project setup procedure, with some files having ``stubs'' automatically generated by this process (as well as a default \texttt{settings.py} and the short \texttt{manage.py} script which is provided to run various application management steps).
-
-\begin{multicols}{2}
-  \dirtree{%
-    .1 /.
-    .2 files.
-    .3 admin.py.
-    .3 apps.py.
-    .3 \_\_init\_\_.py.
-    .3 migrations.
-    .4 \_\_init\_\_.py.
-    .3 \hl{models.py}.
-    .3 templates.
-    .4 files.
-    .5 \hl{create.html}.
-    .5 \hl{dirview.html}.
-    .5 \hl{fileedit.html}.
-    .5 \hl{fileview.html}.
-    .5 \hl{index.html}.
-    .5 \hl{listing.html}.
-    .5 \hl{permissions.html}.
-    .5 \hl{rootdir.html}.
-    .5 \hl{search.html}.
-    .3 tests.py.
-    .3 urls.py.
-    .3 utils.py.
-    .3 \hl{views.py}.
-    .2 (Continued in next column).
-  }
-  \columnbreak
-  \dirtree{%
-    .1 .
-    .2 krbsite.
-    .3 asgi.py.
-    .3 \hl{filedb\_router.py}.
-    .3 \_\_init\_\_.py.
-    .3 \hl{middleware.py}.
-    .3 settings.py.
-    .3 urls.py.
-    .3 wsgi.py.
-    .2 managedb.
-    .3 admin.py.
-    .3 apps.py.
-    .3 forms.py.
-    .3 \_\_init\_\_.py.
-    .3 models.py.
-    .3 templates.
-    .4 managedb.
-    .5 index.html.
-    .5 \hl{result.html}.
-    .5 \hl{table\_mapping.html}.
-    .3 tests.py.
-    .3 urls.py.
-    .3 \hl{views.py}.
-    .2 manage.py.
-  }
-\end{multicols}
-
-The top-level directories represent the separation of ``compontents'' in the Django setup, with \texttt{krbsite} containing whole-system configuration, \texttt{files} containing the setup of the demonstration file manager application, and \texttt{managedb} having the code for the database setup application.
-
-The primary code files are those highlighted above, with the most substantial code additions being in the \texttt{views.py} files for both \texttt{files} and \texttt{managedb} (since these contain the main logic for constructing web pages in the file browser and database management apps respectively). The \texttt{forms.py} files in each of the two directories are used to define web forms to gather user input (some of which are very simple text-gathering fields, but others of which require complex validation of user input, such as the \texttt{TableMappingForm} in \texttt{managedb/forms.py}.
-
-\texttt{files/utils.py} contains two small helper functions which are called by \texttt{files/views.py}.
-
-The \texttt{models.py} in the \texttt{files} app defines the object model used by the file browser application, in the same way as would be done for any other Django app. This includes both the actual data storage tables \texttt{Directory} and \texttt{File}, as well as two permission tables (for directories and files respectively) that are defined here so that the web app can manipulate them using standard Django model operations which are fed back to the database. The \texttt{models.py} file under \texttt{managedb} does not contain anything (beyond the two-line template file provided when a Django app is created) since the database mangement app does not need to store any state itself -- it simply ``reaches in'' to the file management app's database structures to add security policies.
-
-The \texttt{tests.py} files are automatically created by Django for writing unit tests. However, this is generally designed for testing application-specific features (e.g.\ whether the object model has been correctly defined) and so is not especially useful for this project and was not used.
-
-The \texttt{templates} directories contain Django templates for HTML pages, which contain special commands such as the following (that are filled in by the rendering engine):
-
-\begin{verbatim}
-{% for dir, subfiles, subdirs in directories %}
-        {% include "files/listing.html" with root=dir files=subfiles dirs=subdirs %}
-{% endfor %}
-\end{verbatim}
-
-Two of these also contain JavaScript functions, including one which is used to populate one form field based on the value of another in \verb+table_mapping.html+ (under \texttt{managedb/templates}).
-
-In keeping with the principle that the web app should simply be a ``view'' onto the main database (and also the limited privileges that the app itself has for writing to the database), Django uses a separate database for recording session information and associated ``housekeeping'' data, but not any of the actual records which have access control applied to them.
-
-For ease of setup (since this is not a significant aspect of the project), this was done using a simple SQLite database, although the setup did require a Django \texttt{AuthRouter} to make sure that queries are always directed to the appropriate database: see \hyperref[sec:appendix1]{Appendix 1} for more details and code.
-
 \section{SPNEGO}
 SPNEGO (Simple and Protected GSSAPI Negotiation Mechanism) is a mechanism which uses a single packet exchange to itentify a suitable protocol to authenticate the user with. In practice, it is usually used with either NTLM (a different challenge-response protocol) or Kerberos. NTLM is non-ideal in practice because it involves using the hash of a user's password as a long-term key, which means that a key that is stolen from a compromised machine can continue to be used until the user's password is changed (whereas stolen Kerberos tickets are not practically useful since they expire within a relatively short period of time).
 
@@ -464,6 +256,235 @@ The ability of $X$ to get a delegatable ticket using S4U2self can be controlled 
 modprinc -ok_to_auth_as_delegate HTTP/krbsite.local@LOCAL
 \end{verbatim}
 
+\section{Storage of Credential Caches}
+
+Ignoring two Windows-specific mechanisms, MIT Kerberos offers five methods of storing credential caches\cite{MIT-ccache-types}:
+
+\begin{itemize}
+\item
+  \textbf{FILE} mode stores the credential cache into a file on the server's filesystem. This offers the best built-in support in existing modules, but its default configuration is vulnerable to having tickets stolen if the webserver is compromised (see below).
+\item
+  \textbf{DIR} (directory) mode places all tickets in the supplied credential cache into a particular directory. In this case (since $A$ only needs to supply one ticket to $X$) this has no advantage over \textbf{FILE}.
+\item
+  \textbf{KEYRING} mode uses a feature of the Linux kernel to store credentials in an area of private memory. This has the advantage over many of the methods listed here that a kernel keyring can be made process- or thread-specific and so prevent other threads gaining access to private credential caches.
+
+\item
+  \textbf{MEMORY} caches, which are conceptually similar to keyring-based caches except they are not Linux-specific and offer less granularity in setting access permissions. Many of the same issues described above also apply to this cache type, particularly in relation to removing access from threads.
+\item
+  \textbf{KCM} mode was recently added to MIT Kerberos, and uses a specific daemon process to manage credential caches. Although potentially offering advantages over simpler systems (and being less OS-specific than \textbf{KEYRING}), it is still primarily tied to the UID of an operating system user account and so does not offer much security between different tickets held by the same server user. Since having a separate login account on the web server for each database user would normally be impractical, this limits the usefulness of this option.
+\end{itemize}
+
+\section{Requirements Analysis}
+There are three broad components to the setup of this project: the web server, the web application framework and the database.
+
+Of the available open-source web server frameworks, Apache and nginx are two which receive significant use. Both have some form of existing Kerberos support and so this project could probably have been completed using either. As Apache is the only one of the two with which I had any previous experience, I decided to continue using it following some experimentation over the summer (see ``starting point'' below). Apache's module system is also more flexible than nginx's, which offers advantages in this project.
+
+For the web application framework there are many more options, from a basic setup with PHP files to more full-featured systems. Although there would likely have been many good candidates, I selected Django as a widely-used framework which offers the required features (and is written in Python, which is a language that I was previously familiar with).
+
+Finally, there are also a number of possible options for the SQL server running the database. Although my previous SQL experience was primarily using mySQL, PostgreSQL offers more advanced functionality in a number of areas (including flexibility in table security options) and so offers advantages for this project. It also offers built-in support for authenticating to the database using a Kerberos ticket, which is clearly of use here.
+
+\subsection{Source Code Management}
+For the Django directory itself, running it as a git repository with commits pushed to GitHub provides both version control and a backup of the directory in use. This was also checked out into a separate folder on my PC which was backed up to Dropbox, to provide an additional layer of backup.
+
+Since the main development was completed in virtual machines which would have been time-consuming to set up again if lost, I also took backups of the whole VM setup to an external hard drive during development. In the event of a failure, I could have restored these backups to a replacement PC to continue working on them.
+
+\subsection{Testing Methodology}
+Since the core aims of the project are to provide a secure system, this can be most appropriately tested using a security analysis of the types of vulnerabilities (such as SQL injection) which it is vulnerable to, and how this compares with other systems in current use. As a na\"ive implementation of the project also has the potential to result in slower performance than existing systems (due to extra authentication overheads), evaluation of performance and comparing it with a non-Kerberos based system is also a component of evaluating the system.
+
+\section{Starting Point}
+(N.B.\ the text below is a slightly modified version of the starting point submitted in my project proposal)
+
+Kerberos support for Apache already exists (via the \verb+mod_auth_gssapi+ module), and this includes some ability to delegate tickets although with drawbacks (principally that the tickets to be delegated are placed in a directory which is accessible to any process running as the webserver user). Django similarly includes Kerberos extensions (such as \verb+django-gssapi+), but these do not directly offer any delegation facilities and are ultimately not really relevant to this project since Django does not need to participate in Kerberos authentication other than passing on login information. As a starting point, I have investigated these and built on the functionality which they already offer.
+
+PostgreSQL already has support for Kerberos and this can be used as a back-end database system.
+
+I previously had some knowledge of authentication systems and general security topics from the 1B Security course, and of C programming from the 1B Programming in C and C++ course. I have also had general experience with web application setup (although not the specific technologies involved here, which required learning how Django works and the syntax of its templating language) through the 1B Group Project and work done outside the Tripos.
+
+In addition, over the summer vacation I did some experimentation with Kerberos authentication to set up a virtual machine using the existing Kerberos functionality of Apache and PostgreSQL (logging in separately to the two applications without any delegation of tickets).
+
+The Django documentation\cite{Django-docs} was used as a reference and guide throughout development, including using (some of) the provided tutorial to set up the basic web app before being integrated with the Kerberos authentication setup.
+
+
+\chapter{Implementation}
+
+\section{Project Structure}
+
+\subsection{Overall Structure}
+The overall structure of the authentication process is as shown below.
+
+Since the same KDC can be used for many websites where the users all have a login to the same Kerberos realm, the system also functions as a single sign-on system (using the Kerberos ticket as proof of identity). As detailed in sections 2 and 3, this means that none of the individual websites need to be given access to the user's password, and that that they are not able to arbitrarily impersonate the user on other systems. The possibility of delegating tickets in a controlled manner means that the website shown can fetch data from the database on behalf of the user, but it cannot get any data from other systems which it has not been authorised to access. It also cannot get data on behalf of users for whom it does not hold a live Kerberos ticket (so there is no way to access the records of users who have not used the system for a time interval at least as long as the expiry time of their tickets).
+
+\begin{center}
+  \begin{tikzpicture}[node distance=2.2cm]
+    \node (user) [plain] {User};
+    \node (webserver) [untrusted, below of=user, yshift=-1cm] {Website};
+    \node (database) [trusted, below of=webserver] {Database};
+    \node (kdc) [trusted, left of=user, xshift=-2cm] {KDC};
+
+    \draw [arrow, bend right] (user) edge node[above, xshift=2.5cm] {\parbox{0.5\textwidth}{\textcircled{1} \\ Username: \texttt{alice} \\ Password: \texttt{*****}}} (kdc);
+
+    \draw [arrow, bend right] (kdc) edge node[above, yshift=-0.5cm] {\textcircled{2} Kerberos ticket} (user);
+
+    \draw [arrow, bend right] (user) edge node[left, yshift=-0.6cm] {\textcircled{3} Kerberos ticket} (webserver);
+
+    \draw [arrow, bend right] (webserver) edge node[left] {\parbox{0.3\textwidth}{\raggedright \textcircled{4} \texttt{SELECT} the records which this ticket can access (\textbf{delegated ticket} of Alice)}} (database);
+
+    \draw [arrow, bend right] (database) edge node[right] {\textcircled{5} Here is Alice's data} (webserver);
+    \draw [arrow, bend right] (webserver) edge node[right] {\textcircled{6} Here is your data} (user);
+  \end{tikzpicture}
+\end{center}
+
+Note that, unlike in the diagram shown in \hyperref[sec:sql_injection]{Section 1.1.1}, the web application no longer has to be part of the trusted computing base; it does merely passes on the Kerberos ticket which a user has provided and does not have any other method of accessing the data in the database. This means that an attack such as the one depicted in the previous diagram cannot take place.
+
+\subsection{Demonstration Web Application}
+The project demonstrates a web application that uses Kerberos authentication and delegation to fetch data from a database and display it to the user, in the form of a basic file browser-type application. Django makes use of a structure based on \textit{models} which correspond roughly to classes in the object-oriented programming model (and are represented by Python classes in the Django configuration), with each model being able to have different attributes (which are set up as member variables of the class). When stored in a database, each model is a table, with each object of a model being a row in that table and each attribute being a column.
+
+In the example web app, the models are files and directories, plus associated tables to hold access permissions for both files and directories. The database model can be represented in the following entity-relationship diagram:
+
+\begin{center}
+  \begin{tikzpicture}[node distance=3cm]
+    \node[entity] (file) {File}
+         [grow=up, sibling distance=2cm]
+         child {node[attribute, left of=file] {id}}
+         child {node[attribute] {name}}
+         child {node[attribute] {contents}}
+         child {node[attribute] {owner}};
+
+         \node[relationship, right of=file, align=center] (file_location) {File \\ location};
+
+         \node[entity, right of=file_location] (directory) {Directory}
+              [grow=up, sibling distance=2cm]
+              child {node[attribute] {id}}
+              child {node[attribute] {name}}
+              child {node[attribute] {owner}};
+
+              \node[relationship, right of=directory, align=center] (directory_parent) {Directory \\ parent};
+
+              \node[relationship, below of=file, align=center] (file_permission) {File \\ permission};
+
+              \node[entity, below of=file_permission, align=center] (file_permission_entry) {File Permission \\ Entry}
+                   [sibling distance=2cm]
+                   child {node[attribute] {id}}
+                   child {node[attribute] {owner}};
+
+                   \node[relationship, below of=directory, align=center] (directory_permission) {Directory \\ permission};
+
+                   \node[entity, below of=directory_permission, align=center] (directory_permission_entry) {Directory \\ Permission Entry}
+                        [sibling distance=2cm]
+                        child {node[attribute] {id}}
+                        child {node[attribute] {owner}};
+
+                        \path (file) edge node [above] {$n$} (file_location);
+                        \path (file_location) edge node [above] {1} (directory);
+
+                        \path (directory) edge node [above] {$n$} (directory_parent);
+                        \path (directory_parent) edge[bend left] node [below] {1} (directory);
+
+                        \path (file) edge node [left] {1} (file_permission);
+                        \path (file_permission) edge node [left] {$n$} (file_permission_entry);
+
+                        \path (directory) edge node [left] {1} (directory_permission);
+                        \path (directory_permission) edge node [left] {$n$} (directory_permission_entry);
+  \end{tikzpicture}
+\end{center}
+
+\subsubsection{Database Setup Application}
+It also includes a component which performs the necessary setup tasks (setting up SQL permissions), so that all that is required for the user of the application is to:
+\begin{itemize}
+\item
+  Set up a Django app with the appropriate models
+\item
+  Run the normal Django \texttt{migrate} command to set up the database
+\item
+  Use the web interface (created as part of this project) to set up appropriate access controls
+\end{itemize}
+
+\section{System Structure and Repository Overview}
+The core of this project is a Django web app, which is able to both perform the necessary setup steps to get the system working and (as a separate component) demonstrate the working of the system.
+
+The structure of the directories involved is as shown below. The basic directory layout is as produced by the Django project setup procedure, with some files having ``stubs'' automatically generated by this process (as well as a default \texttt{settings.py} and the short \texttt{manage.py} script which is provided to run various application management steps).
+
+\begin{multicols}{2}
+  \dirtree{%
+    .1 /.
+    .2 files.
+    .3 admin.py.
+    .3 apps.py.
+    .3 \hl{forms.py}.
+    .3 \_\_init\_\_.py.
+    .3 migrations.
+    .4 \_\_init\_\_.py.
+    .3 \hl{models.py}.
+    .3 templates.
+    .4 files.
+    .5 \hl{create.html}.
+    .5 \hl{dirview.html}.
+    .5 \hl{fileedit.html}.
+    .5 \hl{fileview.html}.
+    .5 \hl{index.html}.
+    .5 \hl{listing.html}.
+    .5 \hl{permissions.html}.
+    .5 \hl{rootdir.html}.
+    .5 \hl{search.html}.
+    .3 tests.py.
+    .3 urls.py.
+    .3 \hl{utils.py}.
+    .3 \hl{views.py}.
+    .2 (Continued in next column).
+  }
+  \columnbreak
+  \dirtree{%
+    .1 .
+    .2 krbsite.
+    .3 asgi.py.
+    .3 \hl{filedb\_router.py}.
+    .3 \_\_init\_\_.py.
+    .3 \hl{middleware.py}.
+    .3 settings.py.
+    .3 urls.py.
+    .3 wsgi.py.
+    .2 managedb.
+    .3 admin.py.
+    .3 apps.py.
+    .3 \hl{forms.py}.
+    .3 \_\_init\_\_.py.
+    .3 models.py.
+    .3 templates.
+    .4 managedb.
+    .5 index.html.
+    .5 \hl{result.html}.
+    .5 \hl{table\_mapping.html}.
+    .3 tests.py.
+    .3 urls.py.
+    .3 \hl{views.py}.
+    .2 manage.py.
+  }
+\end{multicols}
+
+The top-level directories represent the separation of ``compontents'' in the Django setup, with \texttt{krbsite} containing whole-system configuration, \texttt{files} containing the setup of the demonstration file manager application, and \texttt{managedb} having the code for the database setup application.
+
+The primary code files are those highlighted above, with the most substantial code additions being in the \texttt{views.py} files for both \texttt{files} and \texttt{managedb} (since these contain the main logic for constructing web pages in the file browser and database management apps respectively). The \texttt{forms.py} files in each of the two directories are used to define web forms to gather user input (some of which are very simple text-gathering fields, but others of which require complex validation of user input, such as the \texttt{TableMappingForm} in \texttt{managedb/forms.py}.
+
+\texttt{files/utils.py} contains two small helper functions which are called by \texttt{files/views.py}.
+
+The \texttt{models.py} in the \texttt{files} app defines the object model used by the file browser application, in the same way as would be done for any other Django app. This includes both the actual data storage tables \texttt{Directory} and \texttt{File}, as well as two permission tables (for directories and files respectively) that are defined here so that the web app can manipulate them using standard Django model operations which are fed back to the database. The \texttt{models.py} file under \texttt{managedb} does not contain anything (beyond the two-line template file provided when a Django app is created) since the database mangement app does not need to store any state itself -- it simply ``reaches in'' to the file management app's database structures to add security policies.
+
+The \texttt{tests.py} files are automatically created by Django for writing unit tests. However, this is generally designed for testing application-specific features (e.g.\ whether the object model has been correctly defined) and so is not especially useful for this project and was not used.
+
+The \texttt{templates} directories contain Django templates for HTML pages, which contain special commands such as the following (that are filled in by the rendering engine):
+
+\begin{verbatim}
+{% for dir, subfiles, subdirs in directories %}
+        {% include "files/listing.html" with root=dir files=subfiles dirs=subdirs %}
+{% endfor %}
+\end{verbatim}
+
+Two of these also contain JavaScript functions, including one which is used to populate one form field based on the value of another in \verb+table_mapping.html+ (under \texttt{managedb/templates}).
+
+In keeping with the principle that the web app should simply be a ``view'' onto the main database (and also the limited privileges that the app itself has for writing to the database), Django uses a separate database for recording session information and associated ``housekeeping'' data, but not any of the actual records which have access control applied to them.
+
+For ease of setup (since this is not a significant aspect of the project), this was done using a simple SQLite database, although the setup did require a Django \texttt{AuthRouter} to make sure that queries are always directed to the appropriate database: see \hyperref[sec:appendix1]{Appendix 1} for more details and code.
+
 \section{Credential Cacheing in the Web Server}
 When user $A$ provides a Kerberos ticket for service $X$ as part of the GSSAPI process, the ticket can either be discarded immediately following the completion of the request (including after any necessary delegation has occurred) or be cached by the server for future use.
 
@@ -481,24 +502,9 @@ One possible solution would be for the web server to place the ticket itself int
 
 The solution generally adopted here is to cache the tickets on server $X$ and send a (short) session cookie to $A$ so that $X$ can identify $A$ when $A$ connects again and provides the same cookie. However, since this cookie does not carry any information beyond acting as an identifier, $X$ must store a copy of $A$'s Kerberos ticket to use when $A$ connects to the server on subsequent occasions.
 
-Ignoring two Windows-specific mechanisms, MIT Kerberos offers five methods of storing credential caches\cite{MIT-ccache-types}:
+As described in section TODO, MIT Kerberos offers a number of ways to store credential caches for future use. Although keyring-based credential caches are initially attractive, the process model used by the Apache web server introduces some difficulties in this situation. Since the same Apache worker process may be used to process different (unrelated) requests at different times, it is important that these requests do not have access to the credential caches saved for the previous requests using that thread. Since the thread and process IDs will remain the same for future requests, this is difficult to acheive.
 
-\begin{itemize}
-\item
-  \textbf{FILE} mode stores the credential cache into a file on the server's filesystem. This offers the best built-in support in existing modules, but its default configuration is vulnerable to having tickets stolen if the webserver is compromised (see below).
-\item
-  \textbf{DIR} (directory) mode places all tickets in the supplied credential cache into a particular directory. In this case (since $A$ only needs to supply one ticket to $X$) this has no advantage over \textbf{FILE}.
-\item
-  \textbf{KEYRING} mode uses a feature of the Linux kernel to store credentials in an area of private memory. This has the advantage over many of the methods listed here that a kernel keyring can be made process- or thread-specific and so prevent other threads gaining access to private credential caches.
-
-  However, the process model used by the Apache web server introduces some difficulties in this situation. Since the same Apache worker process may be used to process different (unrelated) requests at different times, it is important that these requests do not have access to the credential caches saved for the previous requests using that thread. Since the thread and process IDs will remain the same for future requests, this is difficult to acheive.
-
-  Further, the \verb+mod_auth_gssapi+ module is currently only designed to work with file-based caches (the \verb+mag_store_deleg_creds+ function assumes that any input it is given is a filename and prepends \texttt{FILE:} to the input, and the \verb+gss_store_cred_into+ function which is then called is only set up to write output data into a file). It would be possible to modify this to work with kernel keyrings (and this was something I investigated as part of the project), but eventually I used file-based approach (with some additional protections to keep tickets private, as detailed below).
-\item
-  \textbf{MEMORY} caches, which are conceptually similar to keyring-based caches except they are not Linux-specific and offer less granularity in setting access permissions. Many of the same issues described above also apply to this cache type, particularly in relation to removing access from threads.
-\item
-  \textbf{KCM} mode was recently added to MIT Kerberos, and uses a specific daemon process to manage credential caches. Although potentially offering advantages over simpler systems (and being less OS-specific than \textbf{KEYRING}), it is still primarily tied to the UID of an operating system user account and so does not offer much security between different tickets held by the same server user. Since having a separate login account on the web server for each database user would normally be impractical, this limits the usefulness of this option.
-\end{itemize}
+Further, the \verb+mod_auth_gssapi+ module is currently only designed to work with file-based caches (the \verb+mag_store_deleg_creds+ function assumes that any input it is given is a filename and prepends \texttt{FILE:} to the input, and the \verb+gss_store_cred_into+ function which is then called is only set up to write output data into a file). It would be possible to modify this to work with kernel keyrings (and this was something I investigated as part of the project), but eventually I used a varation on the file-based approach.
 
 Although the best-supported by current systems, file caches are non-ideal (in their default configuration) because they are normally placed in a directory whose contents can be enumerated and read by any other process running as the same user. In this case, this means that a web app which was compromised to allow code execution in the context of a user's web app session could access tickets belonging to other users who had logged in recently and whose tickets were still cached.
 
@@ -564,7 +570,7 @@ AND p.owner = user;
 
 Write access cannot be directly granted in this way (except for simple views, which this is not considered to be because it selects data across multiple tables. This can be achieved, either by using \texttt{ON INSERT} rules in the same way as the \texttt{ON SELECT} rules below, or by using SQL triggers\cite{postgres-CREATE_VIEW}.
 
-While less significant than in the case of \texttt{SECURITY DEFINER} functions, views also introduce difficulties for interfacing with Django since each database table now needs to have two entries in the Django model setup (one for the table itself and one for the view). Using abstract classes and inheritance allows some reduction in the amount of duplication, but this is still non-ideal. For example, the following code defines \texttt{File} (the actual model represented in a database table, but not visible to ordinary users) and \texttt{UserFile} (the SQL view that users can select from, which is marked as unmanaged to stop Django creating a full table, rather than simply a view, for it). The \texttt{AbstractFile} class avoids repeating all the fields in both of the subclasses, but still makes for somewhat messy code:
+While less significant than in the case of \texttt{SECURITY DEFINER} functions, views also introduce difficulties for interfacing with Django since each database table now needs to have two entries in the Django model setup (one for the table itself and one for the view). Using abstract classes and inheritance allows some reduction in the amount of duplication, but this is still non-ideal. For example, the following code (which I developed as part of an initial implementation of the web application but subsequently replaced) defines \texttt{File} (the actual model represented in a database table, but not visible to ordinary users) and \texttt{UserFile} (the SQL view that users can select from, which is marked as unmanaged to stop Django creating a full table, rather than simply a view, for it). The \texttt{AbstractFile} class avoids repeating all the fields in both of the subclasses, but still makes for somewhat messy code:
 
 \begin{verbatim}
  class AbstractFile(models.Model):
@@ -690,6 +696,8 @@ As well as this, some further changes are needed to store the \texttt{ccache} na
 The \verb+#ifdef+ macro allows the compiler of PostgreSQL to choose (at compile time) whether Kerberos support will be included in the build or not.
 
 Note that the public API does not need to change at all: since the user passes in a set of key-value pairs specifying connection options, the only change made here is to recognise an additional option in this set (via the \verb+ccache_name+ shown above). If the user does not specify this option, its value defaults to \texttt{NULL}, and in this case it is simply ignored and PostgreSQL works as normal (because of the null check around the \verb+gss_krb5_ccache_name+ call shown above).
+
+Having created the patch, I submitted it to the \texttt{pgsql-hackers} mailing list for consideration by the maintainers of PostgreSQL\cite{postgres-patch-list}. Following some discussion of use cases for this patch, another list member (Stephen Frost) suggested that the case of an application such as the one developed here, it would be possible to pass the ticket directly from Apache to the webserver's Kerberos library via an environment variable. That is true in this particular case (and I then implemented that in this project as a simpler solution), but there are still certainly use cases for the patch. In the case of this project, it could be used if the webserver needed to access the database using credentials other than the user's (for example, this could serve as part of system where the web server can write a log to a database table using its own Kerberos ticket, which was a planned possible extension for the project), and several other users on the mailing list expressed interest in having the patch submitted for inclusion in a future PostgreSQL version.
 
 
 \chapter{Evaluation}
@@ -891,6 +899,8 @@ filedb2=# \dp
 \bibitem{postgres-GSSAPI} PostgreSQL documentation: GSSAPI Authentication \url{https://www.postgresql.org/docs/13/gssapi-auth.html} (accessed 19/04/2021)
 
 \bibitem{AcceptPathInfo-source} Apache web server source code: \texttt{AcceptPathInfo} \url{https://github.com/apache/httpd/blob/587d17015167f442c98efaf497504fe3825a3fe7/server/core.c#L3394} (accessed 02/05/2021)
+
+\bibitem{postgres-patch-list} \texttt{pgsql-hackers} mailing list, \textit{PATCH: Add GSSAPI ccache\_name option to libpq} \url{https://www.postgresql.org/message-id/flat/183cb0c3-30a9-149e-5403-fd36800e8c2b%40gmail.com} (accessed 06/05/2021) [N.B. link contains a personal identifier]
 
 % Kew, Nick. (2007). The Apache modules book : Application development with Apache (1st ed., Prentice Hall open source software development series The Apache modules book).
 
