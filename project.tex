@@ -27,9 +27,12 @@
 \begin{document}
 \maketitle
 
+\tableofcontents
+
 \chapter{Introduction}
 
 \section{Web application security}
+\label{sec:web_application_security}
 Many web applications are built around a database, which is used by the application framework to store user data and allow a user to view and edit it. In general, the user logs in using a username and password (which is checked by the web app framework itself), and the application then makes database queries on the user's behalf, processes the results, and displays them to the user in a suitable way.
 
 In this scenario, the application framework has the ability to read and write arbitrary data in the database, and the only thing which prevents a malicious user from accessing data for which they have no authorisation to is the application code itself. This is potentially problematic, since web app authors are often not security experts and may accidentally cause data to be visible to the wrong users. Some examples of how this can occur include:
@@ -128,7 +131,7 @@ The Kerberos protocol works based on a system of \textit{tickets}, which are man
 
 A very commonly used implementation of the Kerberos protocol is found in Microsoft's Active Directory system, which is used by many organisations to centrally co-ordinate logins and access to resources on Windows PCs on a corporate network. With only slight modifications, the setup illustrated in this report could be used with a pre-existing Active Directory server to provide a single sign-on system for an organisational intranet or similar.
 
-In both Microsoft-based and open-source implementations, LDAP (Lightweight Directory Access Protocol) databases are commonly used to hold user information. At the most basic level, these hold a set of users and corresponding \textit{attributes} (which could include information about how the user is allowed to log in, which resources that user is allowed to access and so on). The LDAP database also holds information about non-human \textit{principals} (which could be systems such as web or database servers) and so, as explored in section TODO, can be used to set delegation permissions from one system to another.
+In both Microsoft-based and open-source implementations, LDAP (Lightweight Directory Access Protocol) databases are commonly used to hold user information. At the most basic level, these hold a set of users and corresponding \textit{attributes} (which could include information about how the user is allowed to log in, which resources that user is allowed to access and so on). The LDAP database also holds information about non-human \textit{principals} (which could be systems such as web or database servers) and so, as explored in \autoref{sec:kerberos_ticket_delegation}, can be used to set delegation permissions from one system to another.
 
 The basic workings of the Kerberos protocol are as follows:
 
@@ -177,7 +180,7 @@ The server can specify which protocols it is willing to accept. For example, usi
 GssapiAllowedMech krb5
 \end{verbatim}
 
-A full copy of the \verb+.htaccess+ file which configures many options in Apache for this project, is included in \hyperref[sec:appendix2]{Appendix 2}.
+A full copy of the \verb+.htaccess+ file which configures many options in Apache for this project, is included in \hyperref[sec:appendix1]{Appendix 1}.
 
 \section{Kerberos Backend}
 The KDC and related Kerberos backend services are a significant component of the system, and form part of the \textit{trusted computing base} of the setup (i.e.\ the parts of the system which, if compromised, could allow the security of the whole system to be compromised). Although not actually requiring any new software development (since in a real situation this backend would already exist, for instance as an Active Directory server), arranging a suitable test setup with the right permissions was required for the project.
@@ -186,9 +189,10 @@ The KDC and related Kerberos backend services are a significant component of the
 The default backend used by MIT Kerberos is based on Berkeley DB and simply creates a set of 4 files in which to store information on the principals using the system\cite{KDC-database-docs}. While simple to set up (and what I used initially when experimenting with running a Kerberos server), the basic backend does not have sufficient functionality to support constrained delegation of tickets to another system because it is missing the required access control functionality\cite{KRB-DELEG}. Because this was a goal of this project, the Berkeley DB-based system was not suitable.
 
 \subsection{Connecting to an LDAP Server}
-Using the \texttt{kldap} module, a suitably configured LDAP database can be used as a data store for Kerberos principals. This offers additional flexibility above what is possible using the basic backend, and (crucially) allows attributes to be set to define what permissions a given principal has for delegation. This is explored further in section TODO.
+Using the \texttt{kldap} module, a suitably configured LDAP database can be used as a data store for Kerberos principals. This offers additional flexibility above what is possible using the basic backend, and (crucially) allows attributes to be set to define what permissions a given principal has for delegation. This is explored further in \autoref{sec:kerberos_ticket_delegation}.
 
 \section{Kerberos Ticket Delegation}
+\label{sec:kerberos_ticket_delegation}
 Another major aspect of this project is how a ticket can be \textit{delegated} from one server to another, such that the ticket used to log into the web app can be used to authenticate to another system. Kerberos supports several methods of delegation, and I investigated these when researching the best method to set up the web application.
 
 Broadly, there are three ways of controlling what data is accessible to an application $X$ at a given time: which users' tickets the application actually has, how long those tickets last before expiring, and on which other servers $X$ is able to use those tickets.
@@ -257,7 +261,7 @@ modprinc -ok_to_auth_as_delegate HTTP/krbsite.local@LOCAL
 \end{verbatim}
 
 \section{Storage of Credential Caches}
-
+\label{sec:storage_of_credential_caches}
 Ignoring two Windows-specific mechanisms, MIT Kerberos offers five methods of storing credential caches\cite{MIT-ccache-types}:
 
 \begin{itemize}
@@ -312,7 +316,7 @@ The Django documentation\cite{Django-docs} was used as a reference and guide thr
 \subsection{Overall Structure}
 The overall structure of the authentication process is as shown below.
 
-Since the same KDC can be used for many websites where the users all have a login to the same Kerberos realm, the system also functions as a single sign-on system (using the Kerberos ticket as proof of identity). As detailed in sections 2 and 3, this means that none of the individual websites need to be given access to the user's password, and that that they are not able to arbitrarily impersonate the user on other systems. The possibility of delegating tickets in a controlled manner means that the website shown can fetch data from the database on behalf of the user, but it cannot get any data from other systems which it has not been authorised to access. It also cannot get data on behalf of users for whom it does not hold a live Kerberos ticket (so there is no way to access the records of users who have not used the system for a time interval at least as long as the expiry time of their tickets).
+Since the same KDC can be used for many websites where the users all have a login to the same Kerberos realm, the system also functions as a single sign-on system (using the Kerberos ticket as proof of identity). As previously described, this means that none of the individual websites need to be given access to the user's password, and that that they are not able to arbitrarily impersonate the user on other systems. The possibility of delegating tickets in a controlled manner means that the website shown can fetch data from the database on behalf of the user, but it cannot get any data from other systems which it has not been authorised to access. It also cannot get data on behalf of users for whom it does not hold a live Kerberos ticket (so there is no way to access the records of users who have not used the system for a time interval at least as long as the expiry time of their tickets).
 
 \begin{center}
   \begin{tikzpicture}[node distance=2.2cm]
@@ -334,7 +338,7 @@ Since the same KDC can be used for many websites where the users all have a logi
   \end{tikzpicture}
 \end{center}
 
-Note that, unlike in the diagram shown in \hyperref[sec:sql_injection]{Section 1.1.1}, the web application no longer has to be part of the trusted computing base; it does merely passes on the Kerberos ticket which a user has provided and does not have any other method of accessing the data in the database. This means that an attack such as the one depicted in the previous diagram cannot take place.
+Note that, unlike in the diagram shown in \autoref{sec:sql_injection}, the web application no longer has to be part of the trusted computing base; it does merely passes on the Kerberos ticket which a user has provided and does not have any other method of accessing the data in the database. This means that an attack such as the one depicted in the previous diagram cannot take place.
 
 \subsection{Demonstration Web Application}
 The project demonstrates a web application that uses Kerberos authentication and delegation to fetch data from a database and display it to the user, in the form of a basic file browser-type application. Django makes use of a structure based on \textit{models} which correspond roughly to classes in the object-oriented programming model (and are represented by Python classes in the Django configuration), with each model being able to have different attributes (which are set up as member variables of the class). When stored in a database, each model is a table, with each object of a model being a row in that table and each attribute being a column.
@@ -388,8 +392,8 @@ In the example web app, the models are files and directories, plus associated ta
   \end{tikzpicture}
 \end{center}
 
-\subsubsection{Database Setup Application}
-It also includes a component which performs the necessary setup tasks (setting up SQL permissions), so that all that is required for the user of the application is to:
+\subsection{Database Setup Application}
+The project also includes a component which performs the necessary setup tasks (setting up SQL permissions), so that all that is required for the user of the application is to:
 \begin{itemize}
 \item
   Set up a Django app with the appropriate models
@@ -399,7 +403,7 @@ It also includes a component which performs the necessary setup tasks (setting u
   Use the web interface (created as part of this project) to set up appropriate access controls
 \end{itemize}
 
-\section{System Structure and Repository Overview}
+\section{Repository Overview}
 The core of this project is a Django web app, which is able to both perform the necessary setup steps to get the system working and (as a separate component) demonstrate the working of the system.
 
 The structure of the directories involved is as shown below. The basic directory layout is as produced by the Django project setup procedure, with some files having ``stubs'' automatically generated by this process (as well as a default \texttt{settings.py} and the short \texttt{manage.py} script which is provided to run various application management steps).
@@ -483,9 +487,10 @@ Two of these also contain JavaScript functions, including one which is used to p
 
 In keeping with the principle that the web app should simply be a ``view'' onto the main database (and also the limited privileges that the app itself has for writing to the database), Django uses a separate database for recording session information and associated ``housekeeping'' data, but not any of the actual records which have access control applied to them.
 
-For ease of setup (since this is not a significant aspect of the project), this was done using a simple SQLite database, although the setup did require a Django \texttt{AuthRouter} to make sure that queries are always directed to the appropriate database: see \hyperref[sec:appendix1]{Appendix 1} for more details and code.
+For ease of setup (since this is not a significant aspect of the project), this was done using a simple SQLite database, although the setup did require a Django \texttt{AuthRouter} to make sure that queries are always directed to the appropriate database: see \hyperref[sec:appendix2]{Appendix 2} for more details and code.
 
 \section{Credential Cacheing in the Web Server}
+\label{sec:credential_cacheing}
 When user $A$ provides a Kerberos ticket for service $X$ as part of the GSSAPI process, the ticket can either be discarded immediately following the completion of the request (including after any necessary delegation has occurred) or be cached by the server for future use.
 
 The first of these offers a ``purer'' Kerberos setup, since the web server does not need to store any state and can simply use a ticket provided by the user on each request. However, this approach significantly limits the performance of the system:
@@ -502,7 +507,7 @@ One possible solution would be for the web server to place the ticket itself int
 
 The solution generally adopted here is to cache the tickets on server $X$ and send a (short) session cookie to $A$ so that $X$ can identify $A$ when $A$ connects again and provides the same cookie. However, since this cookie does not carry any information beyond acting as an identifier, $X$ must store a copy of $A$'s Kerberos ticket to use when $A$ connects to the server on subsequent occasions.
 
-As described in section TODO, MIT Kerberos offers a number of ways to store credential caches for future use. Although keyring-based credential caches are initially attractive, the process model used by the Apache web server introduces some difficulties in this situation. Since the same Apache worker process may be used to process different (unrelated) requests at different times, it is important that these requests do not have access to the credential caches saved for the previous requests using that thread. Since the thread and process IDs will remain the same for future requests, this is difficult to acheive.
+As described in \autoref{sec:storage_of_credential_caches}, MIT Kerberos offers a number of ways to store credential caches for future use. Although keyring-based credential caches are initially attractive, the process model used by the Apache web server introduces some difficulties in this situation. Since the same Apache worker process may be used to process different (unrelated) requests at different times, it is important that these requests do not have access to the credential caches saved for the previous requests using that thread. Since the thread and process IDs will remain the same for future requests, this is difficult to acheive.
 
 Further, the \verb+mod_auth_gssapi+ module is currently only designed to work with file-based caches (the \verb+mag_store_deleg_creds+ function assumes that any input it is given is a filename and prepends \texttt{FILE:} to the input, and the \verb+gss_store_cred_into+ function which is then called is only set up to write output data into a file). It would be possible to modify this to work with kernel keyrings (and this was something I investigated as part of the project), but eventually I used a varation on the file-based approach.
 
@@ -668,7 +673,8 @@ cursor.execute("""SELECT column_name
     [table])
 \end{verbatim}
 
-\section{Kerberos access to PostgreSQL}
+\section{PostgreSQL Patch for Specifying Credential Cache}
+\label{sec:postgresql_patch}
 Although PostgreSQL includes Kerberos-based authentication via the GSSAPI framework\cite{postgres-GSSAPI}, the client which connects it to Django (and to most other applications) currently does not offer a choice of which ticket to use and simply takes a stored ticket from the system's default \texttt{ccache} location. This is obviously unsatisfactory in the case of an application where many user's tickets will be stored and the application must use the appropriate ticket each time, and so I have added a patch to the PostgreSQL client library to perform this.
 
 Django's interactions with PostgreSQL are achieved using the \texttt{psycopg} library, which forms the basis for the PostgreSQL backend which comes with Django. However, much of the actual library functionality is simply a wrapper around the C-based \texttt{libpq} library, which is provided as part of PostgreSQL and manages the actual interaction with the database server.
@@ -707,7 +713,10 @@ The two success criteria for the functionality of the application (that a user c
 
 The final criterion (that the project is constructed as a Django add-on) was ultimately not necessary, since no Django modifications were needed to achieve the changes made. Instead, I constructed a setup application (which was implemented as a Django-built app) that makes the necessary setup permission changes on the database and provides an easy interface for the database administrator to set up the system.
 
+As an extension, I proposed investigating using the same SQL server to record web server logs (with the web server having its own Kerberos ticket that it could use for this purpose, instead of using the user's ticket). Although I did not actually implement this, the PostgreSQL patch detailed in \autoref{sec:postgresql_patch} would form part of the setup required by allowing the web server to switch between tickets to connect to the database.
+
 \section{The Django Application}
+After authenticating to the web server via Kerberos, users with sufficient PostgreSQL privileges can set up access control policies via the database setup application, and all users with appropriate permissions can view and edit ``files'' on the system. The actual authentication process is done by the browser and is transparent to the user; see \hyperref[sec:appendix4]{Appendix 4} for a protocol trace.
 
 \subsection{Database Setup}
 The database setup application first presents the user with a welcome screen, displaying the database name which it will operate on (fetched from the Django configuration -- \verb+DELEG_DATABASE+ is a new option added to the \verb+settings.py+ file which specifies to the web app which database should be accessed via delegated ticket):
@@ -779,63 +788,62 @@ filedb2=# SELECT owner, COUNT(*) AS TOTAL FROM files_file GROUP BY owner;
 
 This therefore demonstrates how \textbf{the presence of an SQL injection vulnerability in the constructed application does not allow unauthorised access to data}.
 
-\section{Security Analysis}
-
 \begin{landscape}
   \section{Creation of Database Rules}
   The row-level security rules created by the database setup process can be inspected by directly logging in to the database server and using the PostgreSQL \verb+\dp+ command to list all privilege configurations on the current database. Doing this for the database after running the setup application produces the following result:
 
-  (N.B. the ``Schema'' and ``Column privileges'' columns do not show any useful information here and have been omitted from this document for space reaspons)
+  (N.B. the ``Schema'' and ``Column privileges'' columns are included in the output from PostgreSQL, but do not show any useful information here and have been omitted from this document for space reaspons. Some additional line breaks have also been added to the raw output to fit it into this document.)
   {\small
 \begin{verbatim}
 filedb2=# \dp
-                                                              Access privileges
-               Name                |   Type   |   Access privileges                                 Policies
------------------------------------+----------+-----------------------+---------------------------------------------------------------------
+                                                       Access privileges
+               Name                |   Type   |   Access privileges   |                            Policies
+-----------------------------------+----------+-----------------------+-----------------------------------------------------------------
  django_migrations                 | table    |                       |
  django_migrations_id_seq          | sequence | django=rwU/django    +|
                                    |          | =rU/django            |
- files_directory                   | table    | django=arwdDxt/django+| files_directory_view (r):                                          +
-                                   |          | =arw/django           |   (u): (id IN ( SELECT files_directory_permission.directory_id     +
-                                   |          |                       |    FROM files_directory_permission                                 +
-                                   |          |                       |   WHERE ((files_directory_permission.owner)::text = SESSION_USER)))+
-                                   |          |                       | files_directory_view_owner:                                        +
-                                   |          |                       |   (u): ((owner)::text = SESSION_USER)                              +
-                                   |          |                       | files_directory_insert (a):                                        +
+ files_directory                   | table    | django=arwdDxt/django+| files_directory_view (r):                                     +
+                                   |          | =arw/django           |   (u): ( SELECT files_directory_permitted(files_directory.id)
+                                                                                 AS files_directory_permitted)                        +
+                                   |          |                       | files_directory_view_owner:                                   +
+                                   |          |                       |   (u): ((owner)::text = SESSION_USER)                         +
+                                   |          |                       | files_directory_insert (a):                                   +
                                    |          |                       |   (c): true
  files_directory_id_seq            | sequence | django=rwU/django    +|
                                    |          | =rU/django            |
- files_directory_permission        | table    | django=arwdDxt/django+| files_directory_permission_view (r):                               +
-                                   |          | =ard/django           |   (u): true                                                        +
-                                   |          |                       | files_directory_permission_insert (a):                             +
-                                   |          |                       |   (c): (directory_id IN ( SELECT files_directory.id                +
-                                   |          |                       |    FROM files_directory                                            +
-                                   |          |                       |   WHERE ((files_directory.owner)::text = SESSION_USER)))           +
-                                   |          |                       | files_directory_permission_delete (d):                             +
-                                   |          |                       |   (u): (directory_id IN ( SELECT files_directory.id                +
-                                   |          |                       |    FROM files_directory                                            +
+ files_directory_permission        | table    | django=arwdDxt/django+| files_directory_permission_owner:                             +
+                                   |          | =ard/django           |   (u): (directory_id IN ( SELECT files_directory.id           +
+                                   |          |                       |    FROM files_directory                                       +
+                                   |          |                       |   WHERE ((files_directory.owner)::text = SESSION_USER)))      +
+                                   |          |                       | files_directory_permission_view (r):                          +
+                                   |          |                       |   (u): ( SELECT files_directory_permitted(
+                                                                                 files_directory_permission.directory_id)
+                                                                                 AS files_directory_permitted)                        +
+                                   |          |                       | files_directory_permission_insert (a):                        +
+                                   |          |                       |   (c): (directory_id IN ( SELECT files_directory.id           +
+                                   |          |                       |    FROM files_directory                                       +
                                    |          |                       |   WHERE ((files_directory.owner)::text = SESSION_USER)))
  files_directory_permission_id_seq | sequence | django=rwU/django    +|
                                    |          | =rU/django            |
- files_file                        | table    | django=arwdDxt/django+| files_file_view (r):                                               +
-                                   |          | =arw/django           |   (u): (id IN ( SELECT files_permission.file_id                    +
-                                   |          |                       |    FROM files_permission                                           +
-                                   |          |                       |   WHERE ((files_permission.owner)::text = SESSION_USER)))          +
-                                   |          |                       | files_file_view_owner:                                             +
-                                   |          |                       |   (u): ((owner)::text = SESSION_USER)                              +
-                                   |          |                       | files_file_insert (a):                                             +
+ files_file                        | table    | django=arwdDxt/django+| files_file_view (r):                                          +
+                                   |          | =arw/django           |   (u): ( SELECT files_file_permitted(files_file.id)
+                                                                                 AS files_file_permitted)                             +
+                                   |          |                       | files_file_view_owner:                                        +
+                                   |          |                       |   (u): ((owner)::text = SESSION_USER)                         +
+                                   |          |                       | files_file_insert (a):                                        +
                                    |          |                       |   (c): true
  files_file_id_seq                 | sequence | django=rwU/django    +|
                                    |          | =rU/django            |
- files_permission                  | table    | django=arwdDxt/django+| files_permission_view (r):                                         +
-                                   |          | =ard/django           |   (u): true                                                        +
-                                   |          |                       | files_permission_insert (a):                                       +
-                                   |          |                       |   (c): (file_id IN ( SELECT files_file.id                          +
-                                   |          |                       |    FROM files_file                                                 +
-                                   |          |                       |   WHERE ((files_file.owner)::text = SESSION_USER)))                +
-                                   |          |                       | files_permission_delete (d):                                       +
-                                   |          |                       |   (u): (file_id IN ( SELECT files_file.id                          +
-                                   |          |                       |    FROM files_file                                                 +
+ files_permission                  | table    | django=arwdDxt/django+| files_permission_owner:                                       +
+                                   |          | =ard/django           |   (u): (file_id IN ( SELECT files_file.id                     +
+                                   |          |                       |    FROM files_file                                            +
+                                   |          |                       |   WHERE ((files_file.owner)::text = SESSION_USER)))           +
+                                   |          |                       | files_permission_view (r):                                    +
+                                   |          |                       |   (u): ( SELECT files_file_permitted(files_permission.file_id)
+                                                                                 AS files_file_permitted)                             +
+                                   |          |                       | files_permission_insert (a):                                  +
+                                   |          |                       |   (c): (file_id IN ( SELECT files_file.id                     +
+                                   |          |                       |    FROM files_file                                            +
                                    |          |                       |   WHERE ((files_file.owner)::text = SESSION_USER)))
  files_permssion_id_seq            | sequence | django=rwU/django    +|
                                    |          | =rU/django            |
@@ -846,6 +854,51 @@ filedb2=# \dp
   This demonstrates the correct operation of the setup procedure, with suitable constraints on viewing records based on ownership of information (and corresponding to the SQL queries made in the application code).
 
 \end{landscape}
+
+\section{Potential Attacks and Vulnerabilities}
+
+\subsection{SQL Injection}
+As demonstrated above, the presence of an SQL injection vulnerability (even one that allows arbitrary SQL execution) does not weaken the threat model of the system. The web app simply acts as a ``window'' onto the database to execute queries with the privileges of the user logged into the web app, and a user could just as easily use the same Kerberos ticket to log into the database server directly. This contrasts favourably with traditional systems where the web app itself is trusted to access the data of any user and so SQL injection vulnerabilities must be avoided.
+
+\subsection{Theft of Long-Term Secrets}
+As discussed in \autoref{sec:web_application_security}, the possible presence of passwords or other access tokens in source code can cause a risk of improper access if the secrets are not adequately protected. In many cases, database passwords such as these can be used from anywhere on the internet to gain access to all records in the database.
+
+In this application, all authentication to the database is done using Kerberos tickets, and so there is no possibility of directly stealing a database key. However, it is important to note that the approach is still not entirely free of long-term secrets since they are still used in two significant contexts:
+\begin{itemize}
+\item
+  Django's \verb+SECRET_KEY+ is stored in the Django filesystem and used for signing session cookies. Although this is certainly a potential security risk, in this case the Django session is only used for storage of database metadata between requests in the database setup application. Therefore, being able to break or forge these cookies would not provide a substantial advantage to an attacker since the PostgreSQL permissions setup would stop any genuine malicious activity on the database.
+\item
+  Apache's \verb+mod_session+ module is used to provide a session cookie that holds details of a user's authentication status. This represents a compromise to provide more usability at the expense of a slight loss in security, since if the signing key for these cookies were stolen an attacker would be able to impersonate any user who still had a cached ticket on the server. While this is still a clear improvement on a single master password (which if stolen could lead to \textbf{any} user being impersonated), it is nevertheless still a potential issue in some environments. It would easily be possible to dispense with this session cookie if this was required for security, but at the expense of a substantial performance reduction (see section TODO).
+
+  This key is also substantially harder for an attacker to obtain since it is not stored anywhere in the directory structure of the web app itself and incorporates a randomly generated element which means that the key changes (at least) when the server is restarted. This means that, in all practicality, stealing this key is not a practical attack against the system.
+\end{itemize}
+
+\subsection{Data Obtainable from the Database}
+One consequence of using delegated Kerberos tickets for accessing data is that users are given direct access to the database (which they may not otherwise have had). This means that access control must be set up in the database itself, and this may offer a less granular permission model than could be specified if it were controlled web app (although the use of SQL stored procedures would allow a relatively broad set of options).
+
+An example of a (minor) data leak caused by this setup is that it is possible to determine whether an object ID has already been allocated based on whether an \texttt{INSERT} operation with that ID succeeds or fails. On the asumption that these IDs are opaque identifiers such as sequential numbers (as they are in the example application), this is not signifcant, but if the ID contained useful information about the object then this would be a possible covert channel to leak information out.
+
+\subsection{Theft of Credential Caches}
+\label{sec:theft_of_credential_caches}
+If a malicious user were able to execute a process on the web server (under the same system user account as the server application), that process would gain the same access to the credential cache directory that the web server application has.
+
+Because of the patch added to \verb+mod_auth_gssapi+ and the directory permissions being set as described in \autoref{sec:credential_cacheing}, a malicious user could only enumerate files in the credential cache directory by doing a brute-force search on filenames. Given that each ticket is only useful for a small length of time, adding a suitably long random string to the filename should ensure that this method of obtaining tickets is not viable. To note further mitigations of the risks of credential caches being stolen:
+
+\begin{itemize}
+\item
+  The tickets stored in these caches are service tickets, which can only be used on this web server and any services which it is allowed to delegate to. Unlike a password or a Kerberos ticket-granting ticket, they cannot be used on arbitrary other systems.
+\item
+  The only valid tickets that will be on the web server at all are those of users who have recently logged into it. Other users in the organisastion will not have any ``live'' ticket data cached on the webserver, and so their data is not vulnerable even if the web server is compromised.
+\end{itemize}
+
+\subsection{Compromise of the Django application}
+A malicious user who is able to compromise the Django application itself would be able to see all data flowing through the compromised session, since the web app must have access to the data in order to display it.
+
+The credential caches of users actively using the compromised application would also be available the attacker, although the same mitigation that these are server-restricted service tickets would still apply. As in \autoref{sec:theft_of_credential_caches}, a brute-force attack to obtain all credential caches on the system would be technically possible, but should be infeasible given the time taken. There is still no method of obtaining data on behalf of users who have not recently logged into the system.
+
+\subsection{Compromise of the whole webserver}
+Given a root-level compromise of the webserver, all cached credentials would be available to be stolen by an attacker since the root user can override file system access control policies. Any of these tickets could then be used to fetch data from the database, but note that two of the mitigating factors stated in \autoref{sec:theft_of_credential_caches} still apply: these are still service tickets which can only be used on a limited number of systems, and there is no effect on the security of users who have not recently logged into the web server.
+
 
 \chapter{Conclusion}
 
@@ -906,8 +959,44 @@ filedb2=# \dp
 
 \end{thebibliography}
 
-\chapter*{Appendix 1: Django database router}
+\chapter*{Appendix 1: Apache configuration}
 \label{sec:appendix1}
+The following is the complete \verb+.htaccess+ file used to configure options in the Apache web server. This primarily demonstrates the setup of the \verb+mod_auth_gssapi+ module, including the new \texttt{Secure} mode for the \texttt{GssapiDelegCcacheUnique} parameter that was added as part of this project.
+
+\begin{verbatim}
+# Enable GSSAPI authentication
+AuthType GSSAPI
+AuthName "Kerberos site authentication"
+
+# Only allow Kerberos authentication (not NTLM etc.)
+GssapiAllowedMech krb5
+
+# Enable delegation support
+GssapiUseS4U2Proxy On
+
+# Specify where keytab file for server principal is located
+GssapiCredStore keytab:/var/www/apache.keytab
+GssapiCredStore client_keytab:/var/www/apache.keytab
+
+# Save delegated tickets to directory, and add random suffix to make
+# them harder to brute-force
+GssapiDelegCcacheDir /var/run/apache2/clientcaches
+GssapiDelegCcacheUnique Secure
+
+# Strip realm off user name (after Kerberos library has verified it)
+GssapiLocalName On
+
+# Use a session cookie to avoid having to negotiate on each request
+GssapiUseSessions On
+Session On
+SessionCookieName session path=/;httponly;samesite=strict
+
+# Only allow authenticated users to access the application
+Require valid-user
+\end{verbatim}
+
+\chapter*{Appendix 2: Django database router}
+\label{sec:appendix2}
 The code below shows the routing process for Django to determine which database to use for a given type of request:
 
 \begin{verbatim}
@@ -958,43 +1047,6 @@ Once this router is in place, the routing is transparent to the web app, which s
 
 (The code above is loosely based on several examples given in the Django documentation at \url{https://docs.djangoproject.com/en/3.1/topics/db/multi-db/}.)
 
-\chapter*{Appendix 2: Apache configuration}
-\label{sec:appendix2}
-
-The following is the complete \verb+.htaccess+ file used to configure options in the Apache web server. This primarily demonstrates the setup of the \verb+mod_auth_gssapi+ module, including the new \texttt{Secure} mode for the \texttt{GssapiDelegCcacheUnique} parameter that was added as part of this project.
-
-\begin{verbatim}
-# Enable GSSAPI authentication
-AuthType GSSAPI
-AuthName "Kerberos site authentication"
-
-# Only allow Kerberos authentication (not NTLM etc.)
-GssapiAllowedMech krb5
-
-# Enable delegation support
-GssapiUseS4U2Proxy On
-
-# Specify where keytab file for server principal is located
-GssapiCredStore keytab:/var/www/apache.keytab
-GssapiCredStore client_keytab:/var/www/apache.keytab
-
-# Save delegated tickets to directory, and add random suffix to make
-# them harder to brute-force
-GssapiDelegCcacheDir /var/run/apache2/clientcaches
-GssapiDelegCcacheUnique Secure
-
-# Strip realm off user name (after Kerberos library has verified it)
-GssapiLocalName On
-
-# Use a session cookie to avoid having to negotiate on each request
-GssapiUseSessions On
-Session On
-SessionCookieName session path=/;httponly;samesite=strict
-
-# Only allow authenticated users to access the application
-Require valid-user
-\end{verbatim}
-
 \chapter*{Appendix 3: \texttt{mod\_auth\_gssapi} Patch}
 \label{sec:appendix3}
 
@@ -1042,5 +1094,54 @@ Implementing a multiple-choice option (rather than a simple on/off) flag:
      return NULL;
  }
 \end{verbatim}
+
+\chapter*{Appendix 4: HTTP Negotiate Protocol Trace}
+\label{sec:appendix4}
+
+\begin{verbatim}
+$ curl -v --negotiate -u : krbsite.local/files/
+*   Trying 192.168.56.102...
+* TCP_NODELAY set
+* Connected to krbsite.local (192.168.56.102) port 80 (#0)
+> GET /files/ HTTP/1.1
+> Host: krbsite.local
+> User-Agent: curl/7.58.0
+> Accept: */*
+>
+< HTTP/1.1 401 Unauthorized
+< Date: Thu, 29 Apr 2021 16:21:40 GMT
+< Server: Apache/2.4.41 (Ubuntu)
+< WWW-Authenticate: Negotiate
+< Content-Length: 460
+< Content-Type: text/html; charset=iso-8859-1
+<
+* Ignoring the response-body
+* Connection #0 to host krbsite.local left intact
+* Issue another request to this URL: 'http://krbsite.local/files/'
+* Found bundle for host krbsite.local: 0x56331d9c8ad0 [can pipeline]
+* Re-using existing connection! (#0) with host krbsite.local
+* Connected to krbsite.local (192.168.56.102) port 80 (#0)
+* Server auth using Negotiate with user ''
+> GET /files/ HTTP/1.1
+> Host: krbsite.local
+> Authorization: Negotiate YIICewYGKwYBBQUCoIICbzCCAmugDTALBgkqhkiG9xIBAgKigg...
+> User-Agent: curl/7.58.0
+> Accept: */*
+>
+< HTTP/1.1 200 OK
+< Date: Thu, 29 Apr 2021 16:21:40 GMT
+< Server: Apache/2.4.41 (Ubuntu)
+< WWW-Authenticate: Negotiate oYG3MIG0oAMKAQChCwYJKoZIhvcSAQICooGfBIGcYIGZBgkq...
+< Set-Cookie: session=MagBearerToken=fGZU6v8uKhalBbmvCLOYfeHsN5JLLTg3IgFflgCfX...;
+  path=/;httponly;samesite=strict
+< Cache-Control: no-cache, private
+< Content-Length: 2031
+< X-Frame-Options: DENY
+< X-Content-Type-Options: nosniff
+< Referrer-Policy: same-origin
+< Vary: Accept-Encoding
+< Content-Type: text/html; charset=utf-8
+\end{verbatim}
+[The page content now follows]
 
 \end{document}

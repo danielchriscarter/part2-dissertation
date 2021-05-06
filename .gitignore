@@ -3,6 +3,7 @@
 *.log
 *.out
 *.dvi
+*.toc
 
 # Exclude editor-generated files
 *~
