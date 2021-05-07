@@ -1,0 +1,151 @@
+\title {{\Large Computer Science Tripos -- Part II -- Project Proposal}\\ \vspace{10mm} Kerberos-based single sign-on with delegation for web applications}
+
+\author {Candidate 2428G \\ Originator: Dr Markus Kuhn}
+
+\date {October 22, 2020}
+
+\documentclass{article}
+\usepackage[margin=1in, a4paper]{geometry}
+\usepackage{parskip}
+\usepackage[pdfauthor={Candidate 2428G}, pdftitle={Project Proposal}, pdfsubject={Kerberos-based single sign-on with delegation for web applications}]{hyperref}
+%\usepackage{cprotect}
+
+\begin{document}
+\maketitle
+
+\textbf{Project Supervisor}: Dr Markus Kuhn
+
+\textbf{Director of Studies}: Dr Robert Harle
+
+\textbf{Overseers}: Professor Frank Stajano and Dr Amanda Prorok
+
+
+\section*{Project Description}
+Many web applications are built around databases, and traditionally the application itself has full access to any database records and controls access to them by users. This means that security vulnerabilities in the application or framework can result in incorrect access or modification to data, with potentially severe consequences -- a simple vulnerability in a custom-written web application could allow an attacker to access other site users’ personal data.
+
+Kerberos authentication works on the basis of each user getting a ``ticket'' which can be used to gain access to other systems, and so this project aims to set up a system where users can authenticate to a web application via Kerberos, and where there is no ``global secret'' that allows the web application to access all database records. Therefore, as long as the database access rights are set correctly, there is no need for the front-end to perform access control.
+
+The project will involve adding to the Django framework (in the form of a plugin) so that it can receive authenticate a user via a Kerberos ticket, pass that ticket on to a database, and then access that user’s data from the database. Basic Kerberos authentication functionality already exists in Django modules, but this is only designed for authenticating to the web app itself and not passing a Kerberos ticket onto the database.
+
+This will mean that a user can obtain a Kerberos ticket, then use that to authenticate to the website (using the HTTP Negotiate authentication scheme). The same ticket could be used for multiple different sites that are set up in this way, and so it effectively forms a single sign-on system. The web server itself should not have access to database records except via the Kerberos tickets.
+
+To the user, this will mean that they can provide a Kerberos ticket to any site which is part of this system (and is in the same Kerberos ``realm''). Quite apart from the standard benefits of a single sign-on system (only one password required for a whole set of sites, which means that users are more likely to be able to remember a strong password and less likely to record it using insecure methods), this would mean that SQL injection (a type of command injection, which is currently number 1 in the OWASP \textit{Top 10 Web Application Security Risks} list) would not result in any data being disclosed beyond what a user had access to anyway. This is because the database itself would be implementing the security restrictions, and eliminates a significant vulnerability faced by many web applications.
+
+An important aspect of the project is how Kerberos tickets are stored on the web server. Existing technologies often simply store all tickets in a directory on the server, and this makes them vulnerable to any other site running on the same system being able to read and use the tickets. By investigating and building a better means for storing tickets, a compromised site should not mean that all other web sites on the server are automatically also compromised.
+
+\section*{Starting Point}
+Kerberos support for Apache already exists (via the \verb+mod_auth_gssapi+ module and the older \verb+mod_auth_kerb+ module), and this includes some ability to delegate tickets although with drawbacks (particularly that tickets to be delegated are placed in a directory which is accessible to any process running as the webserver user). Django similarly includes Kerberos extensions (such as \verb+django-gssapi+), but these do not directly offer any delegation facilities. As a starting point, I will investigate these and build on the functionality which they already offer.
+
+PostgreSQL already has support for Kerberos and this can be used as a back-end database system.
+
+I have some knowledge of authentication systems and general security topics from the 1B Security course, and of C programming from the 1B Programming in C and C++ course. I have also had general experience with web application setup (although not the specific technologies involved here) through the 1B Group Project and work done outside the Tripos.
+
+In addition, over the summer vacation I have done some experimentation with Kerberos authentication to set up a virtual machine using the existing Kerberos functionality of Apache and PostgreSQL (logging in separately to the two applications without any delegation of tickets).
+
+\section*{Work to be done}
+\begin{enumerate}
+\item Familiarity with the structure of Kerberos authentication (and MIT Kerberos specifically)
+\item Familiarity with Apache web server development (as modifications to the Apache modules may be necessary)
+\item Setting up a environment with a suitable web application and Kerberos server
+\item Implementation and testing of the authentication functionality
+\item Modularising the setup to work as a Django module
+\item Evaluation of the performance and security of the system
+\end{enumerate}
+
+\section*{Success Criteria}
+\begin{itemize}
+\item The project will consist of an add-on to the Django framework which offers Kerberos authentication.
+\item A user must be able to log into the web application by presenting a suitable Kerberos ticket, which the application then uses to fetch data from a database.
+\item The application must not have access to the database other than by Kerberos tickets (so a given piece of data cannot be fetched without a Kerberos ticket corresponding to a principal who has access to that data). This means that a given user cannot access data which they are not authorised to have access to, even in the presence of web app vulnerabilities.
+\end{itemize}
+
+\section*{Evaluation}
+In order to evaluate the functionality, I will develop a basic web application which allows a user to manage an access control list associated with a resource they have uploaded, so as to permit or deny other users access to it. The aim of the project is to enforce this access policy on the SQL server, so that even in the presence of a vulnerability in the web app front-end where arbitrary SQL code could be executed by a user, the access control policy would not be broken.
+
+As a result of this, it is important that the SQL server always ``agrees'' with the web app on who is accessing a page. If this can be demonstrated to be the case, then security vulnerabilities in the web app would not allow and inappropriate access to data, because the authorisation (and authentication) steps would all be performed by the database system.
+
+Uses for this system could include web-based file systems (where a user can upload files and grant certain other users permission to see it), with each user registered as a separate ``user'' in the SQL database. The web app itself would not perform any security and would merely act as a front-end to pass the user's Kerberos ticket onto the database, where authentication and authorisation would occur.
+
+Therefore, the evaluation will take the form of a security analysis of the system and how vulnerable it is to attacks, in particular via SQL injection (as well as also potentially looking at the effect if another site running on the same web server is compromised). In addition, I will measure the performance of the system to consider impacts on response times compared with a basic (non-Kerberos enabled) web app and database.
+
+\section*{Timetable}
+\subsection*{Michaelmas Weeks 4 to 5 (29/10 to 11/11)}
+Set up a basic test environment for this project, with a web server and SQL database which can be queried by the site. At this stage, neither the web site itself nor its connection to the database would have any security.
+
+Milestone: a test web application connecting to a database (without security)
+
+\subsection*{Michaelmas Weeks 6 to 7 (12/11 to 25/11)}
+Investigate existing Kerberos authentication libraries, and use them to set up authentication to the site (so that the site can access the user's Kerberos principal name, for example, and pull this user's data from a database). This would be done with a connection to a ``test'' Kerberos KDC (running locally in a VM). If possible, this will include using existing ticket delegation functionality in Apache.
+
+Milestone: authentication to the web application itself via Kerberos (using existing technologies)
+
+\subsection*{Michaelmas Week 8 to Vacation Week 3 (26/11 to 23/12)}
+Work on adding and improving the ticket delegation functions of the system, so that a user to this (particular) application can supply a Kerberos ticket which is used to access database resources. This includes evaluating approaches to storing tickets, ensuring that the delegation process works properly, and fixing any issues that arise.
+
+Milestone: able to log into a single web application and delegate the Kerberos ticket to a database
+
+\subsection*{Vacation Weeks 4 to 7 (24/12 to 20/01)}
+Modularise the previously built delegation code, so that it can be used as a plug-in with any suitable site based on the Django framework. Test use of this plug-in and fix any further issues.
+
+Milestone: Kerberos ticket delegation system as a web framework plug-in
+
+\subsection*{Lent Weeks 1 to 2 (21/01 to 03/02)}
+Contingency time to fix any remaining issues and further test the system.
+Write mid-project report, and (if possible) begin writing up the project.
+
+Milestone: project report
+
+\subsection*{Lent Weeks 3 to 4 (04/02 to 17/02)}
+Continue to write up the project.
+
+Look into possible improvements to further reduce the vulnerability of the system.
+
+\subsection*{Lent Weeks 5 to 6 (18/02 to 03/03)}
+Finish draft write-up (continue working on extensions if ahead of schedule). Submit to supervisor for review.
+
+Milestone: draft dissertation
+
+\subsection*{Lent Weeks 7 to 8 (04/03 to 17/03)}
+Time for supervisor to read and comment on report.
+
+Work on extensions if time permits (N.B. reduced time available due to Unit of Assessment).
+
+\subsection*{Vacation Weeks 1 to 6 (18/03 to 28/04)}
+Modifications and changes to the report based on feedback.
+
+Complete full write-up, aiming to be ready to submit at the start of Easter term. If further time is available, then continue to work on extensions.
+
+Milestone: dissertation complete
+
+\subsection*{Easter Weeks 1 to 2 (29/04 to 12/05)}
+Contingency time to deal with any last-minute issues and problems.
+
+Deadline: Friday 14th May 2021
+
+\section*{Resources required}
+I plan to use my own computer (quad-core 1.6GHz CPU, 12GB RAM, 1TB hard drive, Linux Mint OS).
+
+Source code will be held in a GitHub repository, with a copy uploaded to Dropbox each day and weekly backups made to an external hard drive.
+
+This means that, in the event of hardware or software failure, I will be able to transition work to a replacement machine or to the MCS. I accept full responsibility for this machine and I have made contingency plans to protect myself against hardware and/or software failure.
+
+\section*{Possible extensions}
+\begin{itemize}
+\item Investigate using the same SQL server to record web server logs -- this would require the web server application to switch Kerberos tickets between the client's ticket (to access client resources) and its own ticket (which would have access to server log tables), and ensure that this process of switching did not impact on the security of the system.
+\item Investigate whether this could be extended to access files over NFS via the same process of ticket delegation from a web application.
+\end{itemize}
+
+\section*{Bibliography}
+\begin{itemize}
+\item \url{https://www.cl.cam.ac.uk/~mgk25/project-ideas/#http-gssapi} (accessed 19/10/2020) \\ The project suggestion which this proposal is based on
+\item \url{https://tools.ietf.org/html/rfc4178} (accessed 19/10/2020) \\ RFC 4178 (The Simple and Protected GSS-API Negotiation Mechanism), which describes the overall standard for Kerberos authentication to web applications
+\item \url{https://tools.ietf.org/html/rfc4559} (accessed 19/10/2020) \\ RFC 4559 (SPNEGO-based Kerberos and NTLM HTTP Authentication in Microsoft Windows), describing a Microsoft-based system which offers similar functionality
+\item \url{https://developer.mozilla.org/en-US/docs/Mozilla/Integrated_authentication} (accessed 19/10/2020) \\ Mozilla Integrated authentication documentation (a useful overall description of web application Kerberos authentication)
+\item \url{https://github.com/gssapi/mod_auth_gssapi} (accessed 19/10/2020) \\ \verb+mod_auth_gssapi+ Apache module documentation
+\item \url{https://pypi.org/project/django-gssapi/} (accessed 19/10/2020)  \\ \verb+django-gssapi+ documentation
+\item \url{https://www.postgresql.org/docs/12/gssapi-auth.html} (accessed 19/10/2020) \\ Using PostgreSQL with GSSAPI
+\item \url{https://web.mit.edu/kerberos/krb5-1.12/doc/} (accessed 19/10/2020) \\ MIT Kerberos documentation
+\item \url{https://owasp.org/www-project-top-ten/} (accessed 21/10/2020) \\  OWASP \textit{Top 10 Web Application Security Risks} list
+\end{itemize}
+
+\end{document}

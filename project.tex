@@ -1,4 +1,4 @@
-\documentclass{report}
+\documentclass[12pt]{report}
 
 \usepackage[pdfusetitle]{hyperref}
 \usepackage[a4paper, margin=1in]{geometry}
@@ -10,7 +10,11 @@
 \usepackage{dirtree}
 \usepackage{textcomp}
 \usepackage{pdflscape}
+\usepackage{makecell}
 \usepackage{multicol}
+\usepackage{multirow}
+
+\usepackage{standalone}
 
 \usepackage{graphicx}
 
@@ -63,7 +67,7 @@ The following diagram represents an example of a typical current setup, and the 
 
     \draw [arrow, bend right] (user) edge node {\parbox{0.65\textwidth}{\textcircled{1} \\ Username: \texttt{\textquotesingle \ OR 1=1; --} \\ Password: *****}} (webserver);
 
-    \draw [arrow, bend right] (webserver) edge node {\parbox{0.65\textwidth}{\textcircled{2} \\ \texttt{SELECT * FROM users WHERE \\ \hfill username = \textquotesingle\textquotesingle \ OR 1=1; -- \textquotesingle}}} (database);
+    \draw [arrow, bend right] (webserver) edge node {\parbox{0.65\textwidth}{\textcircled{2} \\ \texttt{SELECT * FROM users \\ WHERE username = \textquotesingle\textquotesingle \\ OR 1=1; -- \textquotesingle}}} (database);
 
     \draw [arrow, bend right] (database) edge node[right] {\textcircled{3} Here is \textbf{everyone's} data} (webserver);
     \draw [arrow, bend right] (webserver) edge node[right] {\textcircled{4} Here is everyone's data} (user);
@@ -81,7 +85,9 @@ In a way, SQL injection is also a form of master password leakage even though th
 
 To demonstrate how significant a problem this is, a number of companies (such as GitGuardian\cite{GitGuardian}) have been set up simply to monitor online repositories for leaked security keys, and warn their owners. As a case in point, when setting up the test site for this project, the Django \texttt{settings.py} file initially contained a secret key that would allow an attacker to forge cryptographic signatures and so break the security of the application to an extent (but \textbf{not} gain full access to the database due to the application's structure, as detailed below). Although the key was moved to a file outside the repository (and changed, so that knowledge of the old secret key would be of no use to an attacker) before any files were made public, the mere existence of the secret key in a prior commit caused a warning email to be sent to me by GitGuardian within 70 minutes of changing the repository's visibility:
 
-\includegraphics[scale=0.5]{01-gitguardian.png}
+\begin{center}
+  \includegraphics[scale=0.5]{01-gitguardian.png}
+\end{center}
 
 Even though this service only offers after-the-fact detection (a service which has genuinely leaked a secret key must quickly change this key everywhere it is used, and the site may still have been compromised in the meantime), the fact that businesses exist to perform these scans, and seemingly scan all public GitHub repositories to alert their owners, indicates the severity of this issue.
 
@@ -104,7 +110,7 @@ Apart from the requirement that a user has a Kerberos ticket in the first place,
 
 As a demonstration of this in practice, this project includes building an example file-browser application that performs all authentication and authorisation via Kerberos tickets and database permissions, rather than implementing the security in the web app.
 
-While most of the library functionality to acheive this was already existent in some form, the actual completion of the project involved evaluating possible solutions and technologies for each part of the project, and adding functionality to libraries where this was required. The project also involved building the demonstration web application itself in order to provide a simple setup interface and demonstrate the correct working of the system.
+While most of the library functionality to achieve this was already existent in some form, the actual completion of the project involved evaluating possible solutions and technologies for each part of the project, and adding functionality to libraries where this was required. The project also involved building the demonstration web application itself in order to provide a simple setup interface and demonstrate the correct working of the system.
 
 Although involving the development of a web application and associated software patches, the main purpose of this project was to act as a feasibility study of using Kerberos-based authentication (and the associated ticket delegation) to websites. This is not a commonly used setup and many of the standards used with it (such as HTTP Negotiate) remain relatively little-known and obscure. Therefore, several areas of this project included research into a number of different possible approaches for development before selection of a suitable technology, and in two cases patches to existing open-source projects were developed to add functionality that they did not previously offer.
 
@@ -115,7 +121,7 @@ The core Kerberos system and its extensions are described in a series of IETF RF
 \item
   RFC 2478\cite{RFC2478} describes the \textit{Simple and Protected GSS-API Negotiation Mechanism} (SPNEGO) which gives a (relatively generic) overview of negotiation-based authentication, where a server can provide information on what authentication methods it supports and the client can complete the authentication process using one of these methods. This RFC illustrates examples of how the authentication process works, but is not tied to a particular protocol, and so is an important description of many of the overall concepts referred to in this project.
 \item
-  RFC 2743\cite{RFC2743} (along with several earlier RFCs) defines the current version of the Generic Security Service API (GSS-API) conceptually, using an exchange of tokens to prove identity and incorporating the concept of security tokens being delegatable to another system or process. Principles stated here include that of the tokens being ``opaque from the viewpoint of GSS-API callers'', where the user of a system simply requests a ticket and then passes it to the appropriate service without the user attempting to extract the contents of the ticket. RFC 2744\cite{RFC2744} lays out a concrete API for RFC 2743 in the form of C language bindings.
+  RFC 2743\cite{RFC2743} (along with several earlier RFCs) defines the current version of the Generic Security Service API (GSS-API) conceptually, using an exchange of tokens to prove identity and incorporating the concept of security tokens being delegable to another system or process. Principles stated here include that of the tokens being ``opaque from the viewpoint of GSS-API callers'', where the user of a system simply requests a ticket and then passes it to the appropriate service without the user attempting to extract the contents of the ticket. RFC 2744\cite{RFC2744} lays out a concrete API for RFC 2743 in the form of C language bindings.
 \item
   RFC 4178\cite{RFC4178} describes, at a conceptual level, a negotiation framework for GSS-API systems to select an authentication system which they are both compatible with. Under this setup, the system initiating a connection offers a set of mechanisms which it can use to connect, with an order of preference. The system being connected to can then use the highest-preference system which it is capable of using, or refuse the connection if none of the suggested mechanisms are suitable.
 \item
@@ -137,7 +143,7 @@ The basic workings of the Kerberos protocol are as follows:
 
 \begin{itemize}
 \item
-  A user initiates a session by reqesting a Kerberos ticket from the KDC, authenticating using their password.
+  A user initiates a session by requesting a Kerberos ticket from the KDC, authenticating using their password.
 \item
   The KDC returns a \textit{ticket-granting ticket} (TGT), and returns it encrypted using the user's password.
 \item
@@ -148,7 +154,7 @@ The basic workings of the Kerberos protocol are as follows:
   The TGT grants the user a \textit{service ticket}, which the user then passes on to the service. The service is then able to use that ticket for authentication.
 \end{itemize}
 
-The following listing shows a client which has obtained both a TGT and a service ticket. The ticket in the first line (\verb+krbtgt/LOCAL@LOCAL+) is the \textit{ticket-granting ticket} which the client obtained when first authenticating to the KDC, and the second (\verb+HTTP/krbsite.local@LOCAL+) is a \textit{service ticket} to log in to the \verb+HTTP+ service on \verb+krbsite.local+ (i.e.\ to access the web page hosted on that server).
+The following listing shows a client which has obtained both a TGT and a service ticket. The ticket in the first line (\verb+krbtgt/LOCAL@LOCAL+) is the \textit{ticket-granting ticket} which the client obtained when first authenticating to the KDC, and the second line contains a \textit{service ticket} (\verb+HTTP/krbsite.local@LOCAL+) to log in to the \verb+HTTP+ service on \verb+krbsite.local+ (i.e.\ to access the web page hosted on that server).
 
 \begin{quote}
 \begin{verbatim}
@@ -172,7 +178,7 @@ In addition to use for authentication, Kerberos supports a method of \textit{del
 This is valuable because it means that $X$ can access resources which ``belong'' to $A$, without $X$ needing to have direct access to $Y$. This means that less trust in $X$ is needed (since it does not need privileged access to $Y$), and so the types of attacks discussed above become much less likely.
 
 \section{SPNEGO}
-SPNEGO (Simple and Protected GSSAPI Negotiation Mechanism) is a mechanism which uses a single packet exchange to itentify a suitable protocol to authenticate the user with. In practice, it is usually used with either NTLM (a different challenge-response protocol) or Kerberos. NTLM is non-ideal in practice because it involves using the hash of a user's password as a long-term key, which means that a key that is stolen from a compromised machine can continue to be used until the user's password is changed (whereas stolen Kerberos tickets are not practically useful since they expire within a relatively short period of time).
+SPNEGO (Simple and Protected GSSAPI Negotiation Mechanism) is a mechanism which uses a single packet exchange to identify a suitable protocol to authenticate the user with. In practice, it is usually used with either NTLM (a different challenge-response protocol) or Kerberos. NTLM is non-ideal in practice because it involves using the hash of a user's password as a long-term key, which means that a key that is stolen from a compromised machine can continue to be used until the user's password is changed (whereas stolen Kerberos tickets are not practically useful since they expire within a relatively short period of time).
 
 The server can specify which protocols it is willing to accept. For example, using the \verb+mod_auth_gssapi+ Apache module used here, the following directive ensures that only Kerberos (\texttt{krb5}) authentication will be accepted for GSSAPI:
 
@@ -180,7 +186,7 @@ The server can specify which protocols it is willing to accept. For example, usi
 GssapiAllowedMech krb5
 \end{verbatim}
 
-A full copy of the \verb+.htaccess+ file which configures many options in Apache for this project, is included in \hyperref[sec:appendix1]{Appendix 1}.
+A full copy of the \verb+.htaccess+ file which configures many options in Apache for this project, is included in \autoref{sec:appendix1}.
 
 \section{Kerberos Backend}
 The KDC and related Kerberos backend services are a significant component of the system, and form part of the \textit{trusted computing base} of the setup (i.e.\ the parts of the system which, if compromised, could allow the security of the whole system to be compromised). Although not actually requiring any new software development (since in a real situation this backend would already exist, for instance as an Active Directory server), arranging a suitable test setup with the right permissions was required for the project.
@@ -211,7 +217,7 @@ Despite seemingly being no better than $A$ simply giving a password to $X$ (so t
   Some limitations are placed on what can be done with the tickets. Although $X$ can use the TGT to get a service ticket to any other system $Y$ that $A$ can access, $Y$ does not automatically have the right to delegate this ticket further. If $Y$ does \textbf{not} have the \verb+ok-as-delegate+ flag set, then $X$ can \textit{access} $Y$ on $A$'s behalf but not allow $Y$ to perform actions for $A$ on some other server $Z$. If $Y$ is not well-trusted, this can be a significant benefit. Additionally, tickets sent in this way can be bound to IP addresses, to limit the risk that they are passed on to insecure other systems.
 \end{itemize}
 
-While the second of these advantages is significant, it may still not offer enough access control over the network. In particular, $A$ cannot give $X$ the ability to delegate to $Y$ without also giving $X$ the ability to delegate to \textbf{any} other service which $A$ has access to. In many cases this would be too great a risk; it may well be desirable to allow $X$ to fetch $A$'s work documents from $Y$ to display them in a web app, but not to allow $X$ to retreive $A$'s financial records from another system $Z$ within the same Kerberos realm.
+While the second of these advantages is significant, it may still not offer enough access control over the network. In particular, $A$ cannot give $X$ the ability to delegate to $Y$ without also giving $X$ the ability to delegate to \textbf{any} other service which $A$ has access to. In many cases this would be too great a risk; it may well be desirable to allow $X$ to fetch $A$'s work documents from $Y$ to display them in a web app, but not to allow $X$ to retrieve $A$'s financial records from another system $Z$ within the same Kerberos realm.
 
 In this case, constrained delegation offers a far more controllable method of only allowing services to delegate tickets in particular ways, at the expense of a more complex setup for managing applications.
 
@@ -226,12 +232,12 @@ In addition to the advantages described above for unconstrained delegation, ther
 
 \begin{itemize}
 \item
-  Much richer customization of access control is possible. The system can now be set up so that $A$ can log into $X$ and have a Kerberos ticket delegated to $Y$, or log into $P$ and have a ticket delegated to $Q$, but not allow $X$ to delegate to $Q$. There is no simple set of ``privileged'' applications which are allowed to perform (all) delegation, but a customizable set of permissions between systems, and so applications which simply need to request some data from another server can be assigned restrictive access permissions and do not need to be part of the trusted computing base.
+  Much richer customisation of access control is possible. The system can now be set up so that $A$ can log into $X$ and have a Kerberos ticket delegated to $Y$, or log into $P$ and have a ticket delegated to $Q$, but not allow $X$ to delegate to $Q$. There is no simple set of ``privileged'' applications which are allowed to perform (all) delegation, but a customisable set of permissions between systems, and so applications which simply need to request some data from another server can be assigned restrictive access permissions and do not need to be part of the trusted computing base.
 \item
   The number of powerful ticket-granting tickets that are stored in systems on the network is reduced. If an attacker gains access to $X$, the attacker will, at most, get service tickets for all users who have recently logged into $X$ (i.e.\ who have logged in and whose stored tickets have not yet expired), and delegated service tickets to the services which $X$ is allowed to. The attacker does not get a ticket-granting ticket to use on arbitrary applications.
 \end{itemize}
 
-In this project, the permitted delegation patterns are described using records in the LDAP database. The following pattern is therefore used to allow the web server on \verb+krbsite.local+ to delegate to PostgreSQL on \verb+krb.local+ (i.e.\ set the \texttt{krbAllowedToDelegateTo} attribte on \verb+HTTP/krbsite.local+ to \verb+postgres/krb.local+):
+In this project, the permitted delegation patterns are described using records in the LDAP database. The following pattern is therefore used on the LDAP server to set the \texttt{krbAllowedToDelegateTo} attribte on \verb+HTTP/krbsite.local+ to \verb+postgres/krb.local+ (which allows delegation from the web server on \verb+krbsite.local+ to PostgreSQL running on \verb+krb.local+):
 
 \begin{verbatim}
 dn: krbPrincipalName=HTTP/krbsite.local@LOCAL,cn=LOCAL
@@ -241,7 +247,7 @@ add: krbAllowedToDelegateTo
 krbAllowedToDelegateTo: postgres/krb.local@LOCAL
 \end{verbatim}
 
-Under Microsoft Active directory, a very similar setting named \texttt{msDS-AllowedToDelegateTo} is available, and this can be used in effectively the same way as above to enable constrained delegation from one service to another\cite{MS-deleg-attribute}.
+Under Microsoft Active directory, a similar setting named \texttt{msDS-AllowedToDelegateTo} is available, and this can be used in effectively the same way as above to enable constrained delegation from one service to another\cite{MS-deleg-attribute}.
 
 \subsection{S4U2self}
 This description is included here for completeness (because of its similar name) although it is \textbf{not} a true method of delegating tickets.
@@ -277,6 +283,66 @@ Ignoring two Windows-specific mechanisms, MIT Kerberos offers five methods of st
 \item
   \textbf{KCM} mode was recently added to MIT Kerberos, and uses a specific daemon process to manage credential caches. Although potentially offering advantages over simpler systems (and being less OS-specific than \textbf{KEYRING}), it is still primarily tied to the UID of an operating system user account and so does not offer much security between different tickets held by the same server user. Since having a separate login account on the web server for each database user would normally be impractical, this limits the usefulness of this option.
 \end{itemize}
+
+\section{SQL Access Control}
+\label{sec:sql_access_control}
+A core aspect of this project is the ability to shift access control from the web app itself to the SQL server. Most SQL server applications contain permissions models which allow selective access to data, and there are often a number of ways of achieving this (especially since they are not very well standardised across SQL implementations). As this project specifically uses PostgreSQL, I evaluated a number of supported methods to determine how best to implement the security protocol.
+
+\subsection{Basic SQL permissions}
+In many cases, the basic SQL syntax to allow or deny users access to a whole table may be sufficient. For example, if there is a table of ``sensitive'' information that only a certain group of employees are allowed to see, using simple SQL \texttt{GRANT} statements allows this to be set up without any further complexities. It is only in the case that users need access to specific rows within a table that more complex access control methods need considering.
+
+\subsection{\texttt{SECURITY DEFINER} functions}
+As with most SQL implementations, PostgreSQL allows the definition of stored procedures using the \texttt{CREATE FUNCTION} operation. This allows a pre-written operation, which performs a series of actions and may make changes to the database and/or return a result, to be provided to users of the database.
+
+Basic stored procedures do not have any specific security implications; they are merely a way of avoiding repeatedly executing the same code (and potentially offering performance improvements). However, PostgreSQL defines an additional construct that permits security management: the \texttt{SECURITY DEFINER} property.
+
+A PostgreSQL function with this property specified runs ``as'' the user creating the function, regardless of who executes it\cite{postgres-SEC_DEF} (in a similar way to how the \texttt{setuid} bit works in Unix). This allows the database owner to create a function which can read the whole table and when run, perform some check based on the user calling it and return appropriate results.
+
+These are effectively similar to Trusted Procedures in a Clark-Wilson security model, where data can only be modified by particular procedures which enforce constraints on the data. This therefore allows something of a separation of authentication (logging into the database, via Kerberos) and authorisation (where the procedures describe what access is permitted).
+
+\subsection{SQL views}
+These effectively allow a new table to be created out of a view over an existing table. Using syntax such as the following, it is therefore possible to construct a new table which only has the calling user's data visible; the user can then be granted access to this view (which automatically selects data based on the user's own username) and does not then need to have any access to the original table. For web application purposes, it can be queried just like any other table.
+
+\begin{verbatim}
+CREATE VIEW my_files AS
+SELECT f.*
+FROM files_file f, files_permission p
+WHERE f.id = p.file_id
+AND p.owner = user;
+\end{verbatim}
+
+Write access cannot be directly granted in this way (except for simple views, which this is not considered to be because it selects data across multiple tables. This can be achieved, either by using \texttt{ON INSERT} rules in the same way as the \texttt{ON SELECT} rules below, or by using SQL triggers\cite{postgres-CREATE_VIEW}.
+
+While less significant than in the case of \texttt{SECURITY DEFINER} functions, views also introduce difficulties for interfacing with Django since each database table now needs to have two entries in the Django model setup (one for the table itself and one for the view). Using abstract classes and inheritance allows some reduction in the amount of duplication, but this is still non-ideal. For example, the following code (which I developed as part of an initial implementation of the web application but subsequently replaced) defines \texttt{File} (the actual model represented in a database table, but not visible to ordinary users) and \texttt{UserFile} (the SQL view that users can select from, which is marked as unmanaged to stop Django creating a full table, rather than simply a view, for it). The \texttt{AbstractFile} class avoids repeating all the fields in both of the subclasses, but still makes for somewhat messy code:
+
+\begin{verbatim}
+ class AbstractFile(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=127)
+    directory = models.ForeignKey(Directory,
+                       on_delete=models.CASCADE, null=False)
+    contents = models.TextField(null=True)
+    class Meta:
+        abstract = True
+
+class File(AbstractFile):
+    pass
+
+class UserFile(AbstractFile):
+    class Meta:
+        managed = False
+        db_table = 'my_files'
+\end{verbatim}
+
+\subsection{Use of \texttt{ON SELECT} to redefine selection}
+PostgreSQL also allows rules to be created which effectively redefine actions on tables. For example, a rule could be used to replace the default \texttt{SELECT} rule on the table storing file information with one that checked user permissions.
+
+However, this is likely to introduce unnecessary complexity (particularly with ensuring that administrators can still access data as necessary, for example). For these reasons, the PostgreSQL documentation considers it ``better style to write a \texttt{CREATE VIEW} command than to create a real table and define an \texttt{ON SELECT} rule for it''\cite{postgres-CREATE_RULE}.
+
+\subsection{Row-level security}
+The final method considered, and the one which turned out to be best-suited to this problem, was PostgreSQL's row-level security constructions. These allow policies (defined by the database owner) to determine who can view or modify which rows in the database, and is well-suited to tasks like this.
+
+See \autoref{sec:implementing_database_access_control} for more information about how these were actually used.
 
 \section{Requirements Analysis}
 There are three broad components to the setup of this project: the web server, the web application framework and the database.
@@ -316,18 +382,16 @@ The Django documentation\cite{Django-docs} was used as a reference and guide thr
 \subsection{Overall Structure}
 The overall structure of the authentication process is as shown below.
 
-Since the same KDC can be used for many websites where the users all have a login to the same Kerberos realm, the system also functions as a single sign-on system (using the Kerberos ticket as proof of identity). As previously described, this means that none of the individual websites need to be given access to the user's password, and that that they are not able to arbitrarily impersonate the user on other systems. The possibility of delegating tickets in a controlled manner means that the website shown can fetch data from the database on behalf of the user, but it cannot get any data from other systems which it has not been authorised to access. It also cannot get data on behalf of users for whom it does not hold a live Kerberos ticket (so there is no way to access the records of users who have not used the system for a time interval at least as long as the expiry time of their tickets).
-
 \begin{center}
   \begin{tikzpicture}[node distance=2.2cm]
     \node (user) [plain] {User};
     \node (webserver) [untrusted, below of=user, yshift=-1cm] {Website};
     \node (database) [trusted, below of=webserver] {Database};
-    \node (kdc) [trusted, left of=user, xshift=-2cm] {KDC};
+    \node (kdc) [trusted, left of=user, xshift=-4cm] {KDC};
 
     \draw [arrow, bend right] (user) edge node[above, xshift=2.5cm] {\parbox{0.5\textwidth}{\textcircled{1} \\ Username: \texttt{alice} \\ Password: \texttt{*****}}} (kdc);
 
-    \draw [arrow, bend right] (kdc) edge node[above, yshift=-0.5cm] {\textcircled{2} Kerberos ticket} (user);
+    \draw [arrow, bend right] (kdc) edge node[above, yshift=-0.7cm] {\textcircled{2} Kerberos ticket} (user);
 
     \draw [arrow, bend right] (user) edge node[left, yshift=-0.6cm] {\textcircled{3} Kerberos ticket} (webserver);
 
@@ -337,6 +401,8 @@ Since the same KDC can be used for many websites where the users all have a logi
     \draw [arrow, bend right] (webserver) edge node[right] {\textcircled{6} Here is your data} (user);
   \end{tikzpicture}
 \end{center}
+
+Since the same KDC can be used for many websites where the users all have a login to the same Kerberos realm, the system also functions as a single sign-on system (using the Kerberos ticket as proof of identity). As previously described, this means that none of the individual websites need to be given access to the user's password, and that that they are not able to arbitrarily impersonate the user on other systems. The possibility of delegating tickets in a controlled manner means that the website shown can fetch data from the database on behalf of the user, but it cannot get any data from other systems which it has not been authorised to access. It also cannot get data on behalf of users for whom it does not hold a live Kerberos ticket (so there is no way to access the records of users who have not used the system for a time interval at least as long as the expiry time of their tickets).
 
 Note that, unlike in the diagram shown in \autoref{sec:sql_injection}, the web application no longer has to be part of the trusted computing base; it does merely passes on the Kerberos ticket which a user has provided and does not have any other method of accessing the data in the database. This means that an attack such as the one depicted in the previous diagram cannot take place.
 
@@ -349,9 +415,9 @@ In the example web app, the models are files and directories, plus associated ta
   \begin{tikzpicture}[node distance=3cm]
     \node[entity] (file) {File}
          [grow=up, sibling distance=2cm]
-         child {node[attribute, left of=file] {id}}
+         child {node[attribute, left of=file] {contents}}
+         child {node[attribute] {id}}
          child {node[attribute] {name}}
-         child {node[attribute] {contents}}
          child {node[attribute] {owner}};
 
          \node[relationship, right of=file, align=center] (file_location) {File \\ location};
@@ -410,7 +476,7 @@ The structure of the directories involved is as shown below. The basic directory
 
 \begin{multicols}{2}
   \dirtree{%
-    .1 /.
+    .1 django-code.
     .2 files.
     .3 admin.py.
     .3 apps.py.
@@ -465,13 +531,13 @@ The structure of the directories involved is as shown below. The basic directory
   }
 \end{multicols}
 
-The top-level directories represent the separation of ``compontents'' in the Django setup, with \texttt{krbsite} containing whole-system configuration, \texttt{files} containing the setup of the demonstration file manager application, and \texttt{managedb} having the code for the database setup application.
+The top-level directories represent the separation of ``components'' in the Django setup, with \texttt{krbsite} containing whole-system configuration, \texttt{files} containing the setup of the demonstration file manager application, and \texttt{managedb} having the code for the database setup application.
 
 The primary code files are those highlighted above, with the most substantial code additions being in the \texttt{views.py} files for both \texttt{files} and \texttt{managedb} (since these contain the main logic for constructing web pages in the file browser and database management apps respectively). The \texttt{forms.py} files in each of the two directories are used to define web forms to gather user input (some of which are very simple text-gathering fields, but others of which require complex validation of user input, such as the \texttt{TableMappingForm} in \texttt{managedb/forms.py}.
 
-\texttt{files/utils.py} contains two small helper functions which are called by \texttt{files/views.py}.
+\texttt{files/utils.py} contains two helper functions which are called by \texttt{files/views.py}.
 
-The \texttt{models.py} in the \texttt{files} app defines the object model used by the file browser application, in the same way as would be done for any other Django app. This includes both the actual data storage tables \texttt{Directory} and \texttt{File}, as well as two permission tables (for directories and files respectively) that are defined here so that the web app can manipulate them using standard Django model operations which are fed back to the database. The \texttt{models.py} file under \texttt{managedb} does not contain anything (beyond the two-line template file provided when a Django app is created) since the database mangement app does not need to store any state itself -- it simply ``reaches in'' to the file management app's database structures to add security policies.
+The \texttt{models.py} in the \texttt{files} app defines the object model used by the file browser application, in the same way as would be done for any other Django app. This includes both the actual data storage tables \texttt{Directory} and \texttt{File}, as well as two permission tables (for directories and files respectively) that are defined here so that the web app can manipulate them using standard Django model operations which are fed back to the database. The \texttt{models.py} file under \texttt{managedb} does not contain anything (beyond the two-line template file provided when a Django app is created) since the database management app does not need to store any state itself -- it simply ``reaches in'' to the file management app's database structures to add security policies.
 
 The \texttt{tests.py} files are automatically created by Django for writing unit tests. However, this is generally designed for testing application-specific features (e.g.\ whether the object model has been correctly defined) and so is not especially useful for this project and was not used.
 
@@ -479,15 +545,18 @@ The \texttt{templates} directories contain Django templates for HTML pages, whic
 
 \begin{verbatim}
 {% for dir, subfiles, subdirs in directories %}
-        {% include "files/listing.html" with root=dir files=subfiles dirs=subdirs %}
+        {% include "files/listing.html"
+           with root=dir files=subfiles dirs=subdirs %}
 {% endfor %}
 \end{verbatim}
 
-Two of these also contain JavaScript functions, including one which is used to populate one form field based on the value of another in \verb+table_mapping.html+ (under \texttt{managedb/templates}).
+Two of these also contain JavaScript functions, including one in \verb+table_mapping.html+ (under \verb+managedb/templates+) which is used to populate one form field based on the value of another.
 
 In keeping with the principle that the web app should simply be a ``view'' onto the main database (and also the limited privileges that the app itself has for writing to the database), Django uses a separate database for recording session information and associated ``housekeeping'' data, but not any of the actual records which have access control applied to them.
 
-For ease of setup (since this is not a significant aspect of the project), this was done using a simple SQLite database, although the setup did require a Django \texttt{AuthRouter} to make sure that queries are always directed to the appropriate database: see \hyperref[sec:appendix2]{Appendix 2} for more details and code.
+For ease of setup (since this is not a significant aspect of the project), this was done using a simple SQLite database, although the setup did require a Django \texttt{AuthRouter} to make sure that queries are always directed to the appropriate database: see \autoref{sec:appendix2} for more details and code.
+
+\textbf{Also included} in the repository, but outside the \verb+django-code+ directory, are the two \textbf{patches} (provided as diffs against the existing projects) and a \verb+testing+ directory containing two Python scripts for performance evaluation and graph plotting respectively.
 
 \section{Credential Cacheing in the Web Server}
 \label{sec:credential_cacheing}
@@ -498,32 +567,33 @@ The first of these offers a ``purer'' Kerberos setup, since the web server does 
 \item
   Since the basic HTTP Negotiate setup requires a multi-stage ``handshake'' before communication can begin, each request to the web server now becomes at least two requests. This potentially doubles the access time to the website, as well as consuming extra network bandwidth and placing additional load on the web server. Given that individual web pages often consist of a number of elements (e.g.\ each image on the page would require a new request and another round of HTTP negotiation) this is certainly non-ideal.
 \item
-  Kerberos ticket files are potentially large (especially those issued by Windows-based systems\footnote{As a (somehwat simplistic) illustration of this, obtaining a Kerberos ticket from my test application (running MIT Kerberos) produced a credential cache of size 650 bytes. Obtaining a ticket from the University's Active Directory server \texttt{BLUE.CAM.AC.UK} resulted in a file size of 1536 bytes, or over double the size of the MIT Kerberos ticket.}) and having to include the full ticket in each request may take up significant additional bandwidth. This may cause problems if users are on slow or quota-controlled network connections, and further increases the demand on the server.
+  Kerberos ticket files are potentially large (especially those issued by Windows-based systems\footnote{As a (somewhat simplistic) illustration of this, obtaining a Kerberos ticket from my test application (running MIT Kerberos) produced a credential cache of size 650 bytes. Obtaining a ticket from the University's Active Directory server \texttt{BLUE.CAM.AC.UK} resulted in a file size of 1536 bytes, or over double the size of the MIT Kerberos ticket.}) and having to include the full ticket in each request may take up significant additional bandwidth. This may cause problems if users are on slow or quota-controlled network connections, and further increases the demand on the server.
 \end{itemize}
 
-See section TODO in the evaluation for more discussion of the problems caused by using this approach.
+See \autoref{sec:performance_evaluation} in the evaluation for more discussion of the problems caused by using this approach.
 
 One possible solution would be for the web server to place the ticket itself into a cookie that is sent to the client. This would mean that each request could take place as normal (with the client providing the cookie and the server extracting the ticket from the cookie to use for authentication) and so solve the first of the issues above, but still result in (potentially) large cookie files being sent around and adding a lot of overhead to every request.
 
 The solution generally adopted here is to cache the tickets on server $X$ and send a (short) session cookie to $A$ so that $X$ can identify $A$ when $A$ connects again and provides the same cookie. However, since this cookie does not carry any information beyond acting as an identifier, $X$ must store a copy of $A$'s Kerberos ticket to use when $A$ connects to the server on subsequent occasions.
 
-As described in \autoref{sec:storage_of_credential_caches}, MIT Kerberos offers a number of ways to store credential caches for future use. Although keyring-based credential caches are initially attractive, the process model used by the Apache web server introduces some difficulties in this situation. Since the same Apache worker process may be used to process different (unrelated) requests at different times, it is important that these requests do not have access to the credential caches saved for the previous requests using that thread. Since the thread and process IDs will remain the same for future requests, this is difficult to acheive.
+As described in \autoref{sec:storage_of_credential_caches}, MIT Kerberos offers a number of ways to store credential caches for future use. Although keyring-based credential caches are initially attractive, the process model used by the Apache web server introduces some difficulties in this situation. Since the same Apache worker process may be used to process different (unrelated) requests at different times, it is important that these requests do not have access to the credential caches saved for the previous requests using that thread. Since the thread and process IDs will remain the same for future requests, this is difficult to achieve.
 
-Further, the \verb+mod_auth_gssapi+ module is currently only designed to work with file-based caches (the \verb+mag_store_deleg_creds+ function assumes that any input it is given is a filename and prepends \texttt{FILE:} to the input, and the \verb+gss_store_cred_into+ function which is then called is only set up to write output data into a file). It would be possible to modify this to work with kernel keyrings (and this was something I investigated as part of the project), but eventually I used a varation on the file-based approach.
+Further, the \verb+mod_auth_gssapi+ module is currently only designed to work with file-based caches (the \verb+mag_store_deleg_creds+ function assumes that any input it is given is a filename and prepends \texttt{FILE:} to the input, and the \verb+gss_store_cred_into+ function which is then called is only set up to write output data into a file). It would be possible to modify this to work with kernel keyrings (and this was something I investigated as part of the project), but eventually I used a variation on the file-based approach.
 
 Although the best-supported by current systems, file caches are non-ideal (in their default configuration) because they are normally placed in a directory whose contents can be enumerated and read by any other process running as the same user. In this case, this means that a web app which was compromised to allow code execution in the context of a user's web app session could access tickets belonging to other users who had logged in recently and whose tickets were still cached.
 
 However, clever use of the Unix directory permission model allows this limitation to be overcome. Since read (\texttt{r}) permissions on a directory allow the user to list files contained in it, and execute (\texttt{x}) permissions allow a user to ``traverse'' the directory and read a given file whose name is known, granting a user execute but not read permissions allows the filename to (in effect) become a password that can be used to access the file. Since the permission to list files in the directory is not provided, it is not possible to obtain the filename unless it is separately provided. Therefore, combining this with a ``secret'' filename that is not easily guessable (and is provided separately to the specific webserver process that needs it) can keep saved tickets secure from other processes running as the same user.
 
 \subsection{\texttt{mod\_auth\_gssapi} Patch}
-In order to make use of this, I added an option to \verb+mod_auth_gssapi+ (\texttt{GssapiDelegCcacheRandom}) which adds a random 16-character string to the credential cache name. When combined with \texttt{0300} directory permissions (i.e.\ \texttt{d-wx------} -- the owning user can write to the directory and traverse it to find files if the filename is known, but not read the list of files in it), this means that tickets can only be accessed by knowing the credential cache filename, which is passed to the web app and on to the Kerberos library via an environment variable. Therefore, one instance user's of the web app is not able to obtain tickets belonging to another.
+In order to make use of this, I added an option to the \texttt{GssapiDelegCcacheUnique} directive in \verb+mod_auth_gssapi+ which adds a random 16-character string to the credential cache name. When combined with \texttt{0300} directory permissions (i.e.\ \texttt{d-wx------} -- the owning user can write to the directory and traverse it to find files if the filename is known, but not read the list of files in it), this means that tickets can only be accessed by knowing the credential cache filename, which is passed to the web app and on to the Kerberos library via an environment variable. Therefore, one instance user's of the web app is not able to obtain tickets belonging to another.
 
 The most significant addition in this patch was a new function to generate the random string (using Apache's own random byte generator, but mapping it onto a string that can be included in a filename). I initially investigated using a base64-encoded series of random bytes (as a way of representing the random data as a text string), but the ``standard'' base64 encoding used in the \verb+apr_base64+ Apache library does not produce a string suitable for inclusion in filenames because it includes the \verb+/+ character as part of the character set\cite{RFC4648}. A new library to include the \texttt{BASE64URL} encoding method was recently added to Apache\cite{Apache-base64-commit}, but was not yet available in the packaged Apache version I was using and would have reduced the utility of the patch if it resulted in \verb+mod_auth_gssapi+ now requiring a more recent set of libraries to work. Since an actual standardised encoding of information is not required (just a random sequence of characters which can be part of a valid filename), I simply used 6 bits per byte of the random byte string, and mapped these onto printable characters:
 
 \begin{verbatim}
 static char *get_random_string(apr_size_t length, apr_pool_t *pool)
 {
-    const char *chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.";
+    const char *chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.";
     /* fill a buffer with random data */
     unsigned char *data = apr_palloc(pool, length);
     apr_generate_random_bytes(data, length);
@@ -540,83 +610,51 @@ static char *get_random_string(apr_size_t length, apr_pool_t *pool)
 }
 \end{verbatim}
 
-Further details on the patch are shown in \hyperref[sec:appendix3]{Appendix 3}.
+Further details on the patch are shown in \autoref{sec:appendix3}.
 
+\section{Implementing Database Access Control}
+\label{sec:implementing_database_access_control}
+Having investigated a number of methods to set up access control on database tables in \autoref{sec:sql_access_control}, I evaluated these methods for use in the project.
 
-\section{SQL Access Control}
-A core aspect of this project is the ability to shift access control from the web app itself to the SQL server. Most SQL server applications contain permissions models which allow selective access to data, and there are often a number of ways of achieveing this (especially since they are not very well standardised across SQL implementations). As this project specifically uses PostgreSQL, I evaluated a number of supported methods to determine how best to implement the security protocol.
+\subsection{Stored Procedures}
+While very flexible, \texttt{SECURITY DEFINER} functions are is not easily integrable into frameworks such as Django, which are designed to execute queries on tables rather than (effectively) making function calls to an API. In order to integrate this approach properly into Django, I would have needed to replace for the current object-relationship mapper with one that supported using procedures rather than simple \texttt{SELECT} statements, or otherwise resort to the web app designer having to manually make SQL queries rather than using the built-in database methods. Since the goal is to allow the user to set up a Django web app which works using existing models, this setup is non-ideal as a base.
 
-\subsection{Basic SQL permissions}
-In many cases, the basic SQL syntax to allow or deny users access to a whole table may be sufficient. For example, if there is a table of ``sensitive'' information that only a certain group of employees are allowed to see, using simple SQL \texttt{GRANT} statements allows this to be set up without any further complexities. It is only in the case that users need access to specific rows within a table that more complex access control methods need considering.
-
-\subsection{\texttt{SECURITY DEFINER} functions}
-As with most SQL implementations, PostgreSQL allows the definition of stored procedures using the \texttt{CREATE FUNCTION} operation. This allows a pre-written operation, which performs a series of actions and may make changes to the database and/or return a result, to be provided to users of the database.
-
-Basic stored procedures do not have any specific security implications; they are merely a way of avoiding repeatedly executing the same code (and potentially offering performance improvements). However, PostgreSQL defines an additional construct that permits security management: the \texttt{SECURITY DEFINER} property.
-
-A PostgreSQL function with this property specified runs ``as'' the user creating the function, regardless of who executes it\cite{postgres-SEC_DEF} (in a similar way to how the \texttt{setuid} bit works in Unix). This allows the database owner to create a function which can read the whole table and when run, perform some check based on the user calling it and return appropriate results.
-
-This approach requires some caution since \texttt{SECURITY DEFINER} also redefines \verb+current_user+ (a variable which normally contains the username of the user executing a query) to the user who defined the function, although this can be worked around using \verb+session_user+ instead. Once this is taken into account, such a procedure can be used to return files where the current user has an appropriate entry in a permission table.
-
-These are effectively similar to Trusted Procedures in a Clark-Wilson security model, where data can only be modified by particular procedures which enforce constraints on the data. This therefore allows something of a separation of authentication (logging into the database, via Kerberos) and authorisation (where the procedures describe what access is permitted).
-
-While very flexible, this approach is is not easily integratable into frameworks such as Django, which are designed to execute queries on tables rather than (effectively) making function calls to an API. In order to integrate this approach properly into Django, I would have needed to replace for the current object-relationship mapper with one that supported using procedures rather than simple \texttt{SELECT} statements, or otherwise resort to the web app designer having to manually make SQL queries rather than using the built-in database methods. Since the goal is to allow the user to set up a Django web app which works using existing models, this setup is non-ideal.
-
-\subsection{SQL views}
-These effectively allow a new table to be created out of a view over an existing table. Using syntax such as the following, it is therefore possible to construct a new table which only has the calling user's data visible; the user can then be granted access to this view (which automatically selects data based on the user's own username) and does not then need to have any access to the original table. For web application purposes, it can be queried just like any other table.
+However, it \textbf{can} be used to perform certain ``privileged'' operations as part of the access control checking procedure. I therefore implemented the following (template) function, which allows a user's privileges to be checked without the user having to have read access over the whole privilege table:
 
 \begin{verbatim}
-CREATE VIEW my_files AS
-SELECT f.*
-FROM files_file f, files_permission p
-WHERE f.id = p.file_id
-AND p.owner = user;
+cursor.execute(f"""CREATE OR REPLACE FUNCTION {source_table}_permitted(
+object {source_table}.{source_column}%TYPE)
+RETURNS boolean
+AS $$
+BEGIN
+RETURN session_user IN (SELECT {owner_column} FROM {perm_table}
+WHERE {perm_column} = object);
+END;
+$$ LANGUAGE plpgsql
+SECURITY DEFINER;""")
 \end{verbatim}
 
-Write access cannot be directly granted in this way (except for simple views, which this is not considered to be because it selects data across multiple tables. This can be achieved, either by using \texttt{ON INSERT} rules in the same way as the \texttt{ON SELECT} rules below, or by using SQL triggers\cite{postgres-CREATE_VIEW}.
-
-While less significant than in the case of \texttt{SECURITY DEFINER} functions, views also introduce difficulties for interfacing with Django since each database table now needs to have two entries in the Django model setup (one for the table itself and one for the view). Using abstract classes and inheritance allows some reduction in the amount of duplication, but this is still non-ideal. For example, the following code (which I developed as part of an initial implementation of the web application but subsequently replaced) defines \texttt{File} (the actual model represented in a database table, but not visible to ordinary users) and \texttt{UserFile} (the SQL view that users can select from, which is marked as unmanaged to stop Django creating a full table, rather than simply a view, for it). The \texttt{AbstractFile} class avoids repeating all the fields in both of the subclasses, but still makes for somewhat messy code:
-
-\begin{verbatim}
- class AbstractFile(models.Model):
-    id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=127)
-    directory = models.ForeignKey(Directory, on_delete=models.CASCADE, null=False)
-    contents = models.TextField(null=True)
-    class Meta:
-        abstract = True
-
-class File(AbstractFile):
-    pass
-
-class UserFile(AbstractFile):
-    class Meta:
-        managed = False
-        db_table = 'my_files'
-\end{verbatim}
-
-\subsection{Use of \texttt{ON SELECT} to redefine selection}
-PostgreSQL also allows rules to be created which effectively redefine actions on tables. For example, a rule could be used to replace the default \texttt{SELECT} rule on the table storing file information with one that checked user permissions.
-
-However, this is likely to introduce unnecessary complexity (particularly with ensuring that administrators can still access data as necessary, for example). For these reasons, the PostgreSQL documentation considers it ``better style to write a \texttt{CREATE VIEW} command than to create a real table and define an \texttt{ON SELECT} rule for it''\cite{postgres-CREATE_RULE}.
+The bracketed strings such as \verb+{source_table}+ are filled in by the setup application to reflect the specific database tables in use.
 
 \subsection{Row-level security}
-The final method considered, and the one which turned out to be best-suited to this problem, was PostgreSQL's row-level security constructions. These allow policies (defined by the database owner) to determine who can view which rows in the database.
-
-There are two forms of policy, which are applied in different cicumstances\cite{postgres-policy}:
+The main set of database access control is done using row-level security policies on the database tables. PostgreSQL offers two forms of policy, which are applied in different circumstances\cite{postgres-policy}:
 \begin{itemize}
 \item
   \texttt{USING} policies, which work on existing rows to determine whether users are allowed to view and/or update the contents of a row. This is used for the main data tables (since the main concern is the confidentiality of file data), where the following lines of code allow users to view and update files which they have permission records for:
 
 \begin{verbatim}
 # Enable row-level security on the relevant table
-cursor.execute("""ALTER TABLE %s ENABLE ROW LEVEL SECURITY"""
-        % (source_table))
-# Only allow users to view and edit files which they have permission to see
-cursor.execute("""CREATE POLICY %s_view ON %s
-USING (%s IN (SELECT %s FROM %s WHERE %s = session_user))"""
-        % (source_table, source_table, source_column, perm_column, perm_table,
-           owner_column))
+cursor.execute(f"""ALTER TABLE {source_table}
+                   ENABLE ROW LEVEL SECURITY""")
+# Only allow users to view objects which they have permission to see
+cursor.execute(f"""CREATE POLICY {source_table}_view
+                   ON {source_table} FOR SELECT
+                   USING ((SELECT {source_table}_permitted
+                   ({source_column})))""")
+# Or where they are the owner (in which case allow editing as well)
+cursor.execute(f"""CREATE POLICY {source_table}_view_owner
+                   ON {source_table}
+                   USING ({source_owner_column} = session_user)""")
 \end{verbatim}
 
   With a \texttt{USING} policy, a row which fails the policy is not visible to the user and so cannot be accessed.
@@ -625,18 +663,12 @@ USING (%s IN (SELECT %s FROM %s WHERE %s = session_user))"""
   \texttt{WITH CHECK} policies, which are designed to protect insertion of new rows. These are more suited to protecting the integrity of data (by stopping unauthorised additions) and so are used in this application for the permission tables. Since an attacker could otherwise insert permissions to allow them to read arbitrary files, this is another critical part of the security model:
 
 \begin{verbatim}
-# Also enable row-level security on the permissions table
-cursor.execute("""ALTER TABLE %s ENABLE ROW LEVEL SECURITY"""
-        % (perm_table))
-# Only allow users to set permissions where they already have access to that file
-cursor.execute("""CREATE POLICY %s_view ON %s FOR INSERT
-WITH CHECK (%s IN (SELECT %s FROM %s WHERE %s = session_user))"""
-        % (perm_table, perm_table, perm_column, perm_column, perm_table,
-           owner_column))
+# Only allow users to set permissions where they are the owner
+cursor.execute(f"""CREATE POLICY {perm_table}_insert ON {perm_table}
+                   FOR INSERT WITH CHECK ({perm_column} IN
+                   (SELECT {source_column} FROM {source_table}
+                   WHERE {source_owner_column} = session_user))""")
 \end{verbatim}
-
-  A further special-case policy allows newly created files (with no current owner) to have permissions assigned. With this type of policy, an error is generated if a user tries to create entries without the authority to do so.
-
 \end{itemize}
 
 Note that the table names above are separately verified by the application before being placed into these database queries to avoid SQL injection being directly possible here, but also that logging in as the database administrator to perform these types of actions inherently involves having full access to the database and so it is impossible to remove all SQL injection risks if the application is compromised \textbf{while} the set-up phase is going on.
@@ -646,9 +678,9 @@ The row-level security model runs in parallel with the standard SQL permissions 
 \section{The database setup application}
 As the most significant component of software produced for this project, the database setup application is designed to allow a website administrator to easily set up SQL permissions such that other Django applications (including the file browser example app) work with minimal changes.
 
-This application first needs to gather information from the user to allow a ``matching'' of data and permission tables (i.e.\ to determine which table holds permission records for a given table of data). This is clearly dependent on where there are appropriate table relationships already set up (a permission table must contain a foreign key to the data table), and PostgreSQL exposes this information via an internal \verb+information_schema+ table.
+This application first needs to gather information from the user to allow a ``matching'' of data and permission tables (to determine which table holds permission records for a given table of data). This clearly depends on where there are appropriate table relationships already set up (a permission table must contain a foreign key to the data table), and PostgreSQL exposes this information via an internal \verb+information_schema+ table.
 
-Therefore, executing the following query on a given model (using the \verb+model_data+ paramaters which are incorporated into the query) provides a set of candidate permission tables where such a foreign key exists:
+Therefore, executing the following query on a given model (using the \verb+model_data+ parameters which are incorporated into the query) provides a set of candidate permission tables where such a foreign key exists:
 
 \begin{verbatim}
 cursor.execute("""SELECT dst.table_name, dst.column_name
@@ -673,7 +705,7 @@ cursor.execute("""SELECT column_name
     [table])
 \end{verbatim}
 
-\section{PostgreSQL Patch for Specifying Credential Cache}
+\section{PostgreSQL Patch to Specify Credential Cache}
 \label{sec:postgresql_patch}
 Although PostgreSQL includes Kerberos-based authentication via the GSSAPI framework\cite{postgres-GSSAPI}, the client which connects it to Django (and to most other applications) currently does not offer a choice of which ticket to use and simply takes a stored ticket from the system's default \texttt{ccache} location. This is obviously unsatisfactory in the case of an application where many user's tickets will be stored and the application must use the appropriate ticket each time, and so I have added a patch to the PostgreSQL client library to perform this.
 
@@ -716,7 +748,7 @@ The final criterion (that the project is constructed as a Django add-on) was ult
 As an extension, I proposed investigating using the same SQL server to record web server logs (with the web server having its own Kerberos ticket that it could use for this purpose, instead of using the user's ticket). Although I did not actually implement this, the PostgreSQL patch detailed in \autoref{sec:postgresql_patch} would form part of the setup required by allowing the web server to switch between tickets to connect to the database.
 
 \section{The Django Application}
-After authenticating to the web server via Kerberos, users with sufficient PostgreSQL privileges can set up access control policies via the database setup application, and all users with appropriate permissions can view and edit ``files'' on the system. The actual authentication process is done by the browser and is transparent to the user; see \hyperref[sec:appendix4]{Appendix 4} for a protocol trace.
+After authenticating to the web server via Kerberos, users with sufficient PostgreSQL privileges can set up access control policies via the database setup application, and all users with appropriate permissions can view and edit ``files'' on the system. The actual authentication process is done by the browser and is transparent to the user (see \autoref{sec:protocol_execution}).
 
 \subsection{Database Setup}
 The database setup application first presents the user with a welcome screen, displaying the database name which it will operate on (fetched from the Django configuration -- \verb+DELEG_DATABASE+ is a new option added to the \verb+settings.py+ file which specifies to the web app which database should be accessed via delegated ticket):
@@ -763,7 +795,8 @@ In addition, file contents can easily be updated by the file owner (other users 
 The search feature of the app helps to demonstrate the security of the Kerberos delegation approach in that it contains a (deliberate) SQL injection vulnerability. The search function performs the following query (where \texttt{term} is a string provided by the user):
 
 \begin{verbatim}
-query = "SELECT * FROM " + table + " WHERE CONTENTS LIKE '%%" + term + "%%'"
+query = "SELECT * FROM " + table + "
+         WHERE CONTENTS LIKE '%%" + term + "%%'"
 \end{verbatim}
 
 This can trivially be exploited by passing a search term such as \verb+' OR 1=1;--+ (as detailed in the introduction), and the web app's response shows that it is indeed vulnerable to SQL injection:
@@ -788,62 +821,87 @@ filedb2=# SELECT owner, COUNT(*) AS TOTAL FROM files_file GROUP BY owner;
 
 This therefore demonstrates how \textbf{the presence of an SQL injection vulnerability in the constructed application does not allow unauthorised access to data}.
 
+\section{Protocol Execution}
+\label{sec:protocol_execution}
+Using an approach without session cookies, a simple request to the webserver produces a sequence of packets such as the following:
+
+\begin{center}
+  \includegraphics[width=\textwidth]{09-connect-no-cookie.png}
+\end{center}
+
+This sequence of packets shows an initial HTTP request from the client (192.168.56.1) to the web server (192.168.56.102), which sends back a response (HTTP 401) asking the user to authenticate. The client then requests and obtains a Kerberos service ticket from the Kerberos server (192.168.56.101), makes another request to the web server \textbf{with} this ticket, and receives the page contents as an HTTP response.
+
+Each of the following requests in the sequence of packets repeats this cycle: although the client already has the service ticket, it must still make an initial HTTP request, receive a response requesting authentication and send another HTTP request with the service ticket. This is clearly inefficient, and so session cookies (as described in \autoref{sec:credential_cacheing}) are used in this application.
+
+Once session cookies are enabled, the sequence of packets appears as follows:
+
+\begin{center}
+  \includegraphics[width=\textwidth]{10-connect-cookie.png}
+\end{center}
+
+The initial request is effectively identical to the previous setup. However, the HTTP response in packet 25 now includes a session cookie, which is sent back to the browser in the subsequent requests. This means that the client can now request resources as ``standard'' HTTP requests (with no need to repeat the negotiation process), and so the efficiency of the system is increased (see \autoref{sec:performance_evaluation}).
+
+See \autoref{sec:appendix4} for a protocol trace from the perspective of the client. This includes setting a session cookie, but the negotiation process illustrated is the same whether or not session cookies are used.
+
+
 \begin{landscape}
   \section{Creation of Database Rules}
   The row-level security rules created by the database setup process can be inspected by directly logging in to the database server and using the PostgreSQL \verb+\dp+ command to list all privilege configurations on the current database. Doing this for the database after running the setup application produces the following result:
 
-  (N.B. the ``Schema'' and ``Column privileges'' columns are included in the output from PostgreSQL, but do not show any useful information here and have been omitted from this document for space reaspons. Some additional line breaks have also been added to the raw output to fit it into this document.)
-  {\small
+  (N.B. the ``Schema'' and ``Column privileges'' columns are included in the output from PostgreSQL, but do not show any useful information here and have been omitted from this document for space reasons. Some additional line breaks have also been added to the raw output to fit it into this document.)
+  {\footnotesize
 \begin{verbatim}
 filedb2=# \dp
-                                                       Access privileges
-               Name                |   Type   |   Access privileges   |                            Policies
------------------------------------+----------+-----------------------+-----------------------------------------------------------------
+                                                    Access privileges
+               Name                |   Type   |   Access privileges   |                         Policies
+-----------------------------------+----------+-----------------------+-----------------------------------------------------------
  django_migrations                 | table    |                       |
  django_migrations_id_seq          | sequence | django=rwU/django    +|
                                    |          | =rU/django            |
- files_directory                   | table    | django=arwdDxt/django+| files_directory_view (r):                                     +
-                                   |          | =arw/django           |   (u): ( SELECT files_directory_permitted(files_directory.id)
-                                                                                 AS files_directory_permitted)                        +
-                                   |          |                       | files_directory_view_owner:                                   +
-                                   |          |                       |   (u): ((owner)::text = SESSION_USER)                         +
-                                   |          |                       | files_directory_insert (a):                                   +
+ files_directory                   | table    | django=arwdDxt/django+| files_directory_view (r):                               +
+                                   |          | =arw/django           |   (u): ( SELECT files_directory_permitted(
+                                                                                 files_directory.id)
+                                                                                 AS files_directory_permitted)                  +
+                                   |          |                       | files_directory_view_owner:                             +
+                                   |          |                       |   (u): ((owner)::text = SESSION_USER)                   +
+                                   |          |                       | files_directory_insert (a):                             +
                                    |          |                       |   (c): true
  files_directory_id_seq            | sequence | django=rwU/django    +|
                                    |          | =rU/django            |
- files_directory_permission        | table    | django=arwdDxt/django+| files_directory_permission_owner:                             +
-                                   |          | =ard/django           |   (u): (directory_id IN ( SELECT files_directory.id           +
-                                   |          |                       |    FROM files_directory                                       +
-                                   |          |                       |   WHERE ((files_directory.owner)::text = SESSION_USER)))      +
-                                   |          |                       | files_directory_permission_view (r):                          +
+ files_directory_permission        | table    | django=arwdDxt/django+| files_directory_permission_owner:                       +
+                                   |          | =ard/django           |   (u): (directory_id IN ( SELECT files_directory.id     +
+                                   |          |                       |    FROM files_directory                                 +
+                                   |          |                       |   WHERE ((files_directory.owner)::text = SESSION_USER)))+
+                                   |          |                       | files_directory_permission_view (r):                    +
                                    |          |                       |   (u): ( SELECT files_directory_permitted(
                                                                                  files_directory_permission.directory_id)
-                                                                                 AS files_directory_permitted)                        +
-                                   |          |                       | files_directory_permission_insert (a):                        +
-                                   |          |                       |   (c): (directory_id IN ( SELECT files_directory.id           +
-                                   |          |                       |    FROM files_directory                                       +
+                                                                                 AS files_directory_permitted)                  +
+                                   |          |                       | files_directory_permission_insert (a):                  +
+                                   |          |                       |   (c): (directory_id IN ( SELECT files_directory.id     +
+                                   |          |                       |    FROM files_directory                                 +
                                    |          |                       |   WHERE ((files_directory.owner)::text = SESSION_USER)))
  files_directory_permission_id_seq | sequence | django=rwU/django    +|
                                    |          | =rU/django            |
- files_file                        | table    | django=arwdDxt/django+| files_file_view (r):                                          +
+ files_file                        | table    | django=arwdDxt/django+| files_file_view (r):                                    +
                                    |          | =arw/django           |   (u): ( SELECT files_file_permitted(files_file.id)
-                                                                                 AS files_file_permitted)                             +
-                                   |          |                       | files_file_view_owner:                                        +
-                                   |          |                       |   (u): ((owner)::text = SESSION_USER)                         +
-                                   |          |                       | files_file_insert (a):                                        +
+                                                                                 AS files_file_permitted)                       +
+                                   |          |                       | files_file_view_owner:                                  +
+                                   |          |                       |   (u): ((owner)::text = SESSION_USER)                   +
+                                   |          |                       | files_file_insert (a):                                  +
                                    |          |                       |   (c): true
  files_file_id_seq                 | sequence | django=rwU/django    +|
                                    |          | =rU/django            |
- files_permission                  | table    | django=arwdDxt/django+| files_permission_owner:                                       +
-                                   |          | =ard/django           |   (u): (file_id IN ( SELECT files_file.id                     +
-                                   |          |                       |    FROM files_file                                            +
-                                   |          |                       |   WHERE ((files_file.owner)::text = SESSION_USER)))           +
-                                   |          |                       | files_permission_view (r):                                    +
-                                   |          |                       |   (u): ( SELECT files_file_permitted(files_permission.file_id)
-                                                                                 AS files_file_permitted)                             +
-                                   |          |                       | files_permission_insert (a):                                  +
-                                   |          |                       |   (c): (file_id IN ( SELECT files_file.id                     +
-                                   |          |                       |    FROM files_file                                            +
+ files_permission                  | table    | django=arwdDxt/django+| files_permission_owner:                                 +
+                                   |          | =ard/django           |   (u): (file_id IN ( SELECT files_file.id               +
+                                   |          |                       |    FROM files_file                                      +
+                                   |          |                       |   WHERE ((files_file.owner)::text = SESSION_USER)))     +
+                                   |          |                       | files_permission_view (r):                              +
+                                   |          |                       |   (u): ( SELECT files_file_permitted(
+                                                                                 files_permission.file_id)
+                                                                                 AS files_file_permitted)                       +
+                                   |          |                       | files_permission_insert (a):                            +
+                                   |          |                       |   (c): (file_id IN ( SELECT files_file.id               +
+                                   |          |                       |    FROM files_file                                      +
                                    |          |                       |   WHERE ((files_file.owner)::text = SESSION_USER)))
  files_permssion_id_seq            | sequence | django=rwU/django    +|
                                    |          | =rU/django            |
@@ -868,7 +926,7 @@ In this application, all authentication to the database is done using Kerberos t
 \item
   Django's \verb+SECRET_KEY+ is stored in the Django filesystem and used for signing session cookies. Although this is certainly a potential security risk, in this case the Django session is only used for storage of database metadata between requests in the database setup application. Therefore, being able to break or forge these cookies would not provide a substantial advantage to an attacker since the PostgreSQL permissions setup would stop any genuine malicious activity on the database.
 \item
-  Apache's \verb+mod_session+ module is used to provide a session cookie that holds details of a user's authentication status. This represents a compromise to provide more usability at the expense of a slight loss in security, since if the signing key for these cookies were stolen an attacker would be able to impersonate any user who still had a cached ticket on the server. While this is still a clear improvement on a single master password (which if stolen could lead to \textbf{any} user being impersonated), it is nevertheless still a potential issue in some environments. It would easily be possible to dispense with this session cookie if this was required for security, but at the expense of a substantial performance reduction (see section TODO).
+  Apache's \verb+mod_session+ module is used to provide a session cookie that holds details of a user's authentication status. This represents a compromise to provide more usability at the expense of a slight loss in security, since if the signing key for these cookies were stolen an attacker would be able to impersonate any user who still had a cached ticket on the server. While this is still a clear improvement on a single master password (which if stolen could lead to \textbf{any} user being impersonated), it is nevertheless still a potential issue in some environments. It would easily be possible to dispense with this session cookie if this was required for security, but at the expense of a substantial performance reduction (see \autoref{sec:performance_evaluation}).
 
   This key is also substantially harder for an attacker to obtain since it is not stored anywhere in the directory structure of the web app itself and incorporates a randomly generated element which means that the key changes (at least) when the server is restarted. This means that, in all practicality, stealing this key is not a practical attack against the system.
 \end{itemize}
@@ -876,7 +934,7 @@ In this application, all authentication to the database is done using Kerberos t
 \subsection{Data Obtainable from the Database}
 One consequence of using delegated Kerberos tickets for accessing data is that users are given direct access to the database (which they may not otherwise have had). This means that access control must be set up in the database itself, and this may offer a less granular permission model than could be specified if it were controlled web app (although the use of SQL stored procedures would allow a relatively broad set of options).
 
-An example of a (minor) data leak caused by this setup is that it is possible to determine whether an object ID has already been allocated based on whether an \texttt{INSERT} operation with that ID succeeds or fails. On the asumption that these IDs are opaque identifiers such as sequential numbers (as they are in the example application), this is not signifcant, but if the ID contained useful information about the object then this would be a possible covert channel to leak information out.
+An example of a (minor) data leak caused by this setup is that it is possible to determine whether an object ID has already been allocated based on whether an \texttt{INSERT} operation with that ID succeeds or fails. On the asumption that these IDs are opaque identifiers such as sequential numbers (as they are in the example application), this is not significant, but if the ID contained useful information about the object then this would be a possible covert channel to leak information out.
 
 \subsection{Theft of Credential Caches}
 \label{sec:theft_of_credential_caches}
@@ -888,7 +946,7 @@ Because of the patch added to \verb+mod_auth_gssapi+ and the directory permissio
 \item
   The tickets stored in these caches are service tickets, which can only be used on this web server and any services which it is allowed to delegate to. Unlike a password or a Kerberos ticket-granting ticket, they cannot be used on arbitrary other systems.
 \item
-  The only valid tickets that will be on the web server at all are those of users who have recently logged into it. Other users in the organisastion will not have any ``live'' ticket data cached on the webserver, and so their data is not vulnerable even if the web server is compromised.
+  The only valid tickets that will be on the web server at all are those of users who have recently logged into it. Other users in the organisation will not have any ``live'' ticket data cached on the webserver, and so their data is not vulnerable even if the web server is compromised.
 \end{itemize}
 
 \subsection{Compromise of the Django application}
@@ -899,6 +957,67 @@ The credential caches of users actively using the compromised application would 
 \subsection{Compromise of the whole webserver}
 Given a root-level compromise of the webserver, all cached credentials would be available to be stolen by an attacker since the root user can override file system access control policies. Any of these tickets could then be used to fetch data from the database, but note that two of the mitigating factors stated in \autoref{sec:theft_of_credential_caches} still apply: these are still service tickets which can only be used on a limited number of systems, and there is no effect on the security of users who have not recently logged into the web server.
 
+\section{Performance Evaluation}
+\label{sec:performance_evaluation}
+A legitimate concern in building this project is the risk of degraded performance. Since the HTTP Negotiate protocol requires a multi-way ``handshake'' before starting data transfer, a na\"ive implementation of this project result in much slower access times than with a traditional web app.
+
+Therefore, I measured the access times to reach the file browser main page (which involves requesting data from the database) in each of the following configurations:
+\begin{itemize}
+\item
+  No database security at all (unlikely in reality, but serves as a baseline)
+\item
+  Database authentication with a master password (the typical real-world model)
+\item
+  Access via HTTP-Negotiate and delegated Kerberos tickets, using ticket cacheing on the web server and session cookies (as described in \autoref{sec:credential_cacheing}, and implemented in this project)
+\item
+  Access via HTTP-Negotiate and delegated Kerberos tickets, but \textbf{without} use of session cookies
+\end{itemize}
+
+Each of these access times was recorded 200 times in succession to allow summary statistics (median and quartiles) to be calculated. In addition, I measured the connection times (in both cases to a VM on my laptop running the web server) from my laptop and from a Microsoft Azure VM via an SSH tunnel to give some simulation of the effect of network latency.
+
+\subsection*{Response Times (milliseconds)}
+\begin{tabular}{|l|l|l|l|l|l|l|}
+  \cline{3-7}
+  \multicolumn{2}{l}{} \vline
+  & \textbf{Min.} & \textbf{Quartile 1} & \textbf{Median} & \textbf{Quartile 3} & \textbf{Max.}\\
+  \hline
+  \multirow{4}{*}{\textbf{Laptop}}
+  & No security & 21.1 & 23.4 & 24.8 & 26.4 & 57.0\\
+  \cline{2-7}
+  & Master password & 20.7 & 25.6 & 27.8 & 29.8 & 377\\
+  \cline{2-7}
+  & \makecell[l]{Kerberos with \\ session cookies} & 19.7 & 24.1 & 26.2 & 29.2 & 74.3\\
+  \cline{2-7}
+  & \makecell[l]{Kerberos without \\ session cookies} & 104 & 169 & 210 & 824 & 2070 \\
+  \hline
+  \multirow{4}{*}{\makecell[l]{\textbf{Azure} \\ \textbf{VM}}}
+  & No security & 38.2 & 41.9 & 43.3 & 46.3 & 531\\
+  \cline{2-7}
+  & Master password & 38.7 & 41.7 & 42.7 & 44.3 & 459\\
+  \cline{2-7}
+  & \makecell[l]{Kerberos with \\ session cookies} & 38.2 & 40.5 & 41.5 & 43.2 & 111\\
+  \cline{2-7}
+  & \makecell[l]{Kerberos without \\ session cookies} & 125 & 183 & 209 & 838 & 2160\\
+  \hline
+\end{tabular}
+
+Note that the ``Kerberos without session cookies'' data \textbf{excludes} the first connection of the seesion, where the cookie is obtained.
+
+From the data above, there is a clear performance penalty from using HTTP neogiation without any form of session cookie, with the median access time rising from 20--45ms to over 200ms. There is also less significant, but noticeable, increase in access times when connecting from a remote location (particularly in the case of the maximum times, which would be expected given the possibility of packet loss or other connection issues).
+
+In order to more easily visualise the data and analyse the performance of the system \textbf{with} session cookies enabled, I created box-plots (with outliers removed) of first three rows of data for each of the two connection sources:
+
+\begin{center}
+  \includegraphics[width=0.8\textwidth]{11-response-times-laptop.pdf}
+\end{center}
+
+\begin{center}
+  \includegraphics[width=0.8\textwidth]{12-response-times-azure.pdf}
+\end{center}
+
+From these plots, there is no indication of a reduction in performance compared with the use of a master database password (in fact the median values suggest a slight speed improvement, although the natural variation in the data means that the two approaches are likely to offer roughly equal performance in practice).
+
+Although there is the overhead of the initial request to obtain the session cookie before the response times above are achievable, the same would apply to any single sign-on system (where a user will normally be redirected to an external server for authentication, as in the OAuth2 protocol). Therefore, the performance overheads associated with this system should not be noticeably greater than in existing single sign-on systems.
 
 \chapter{Conclusion}
 
@@ -959,7 +1078,8 @@ Given a root-level compromise of the webserver, all cached credentials would be 
 
 \end{thebibliography}
 
-\chapter*{Appendix 1: Apache configuration}
+\appendix
+\chapter{Apache configuration}
 \label{sec:appendix1}
 The following is the complete \verb+.htaccess+ file used to configure options in the Apache web server. This primarily demonstrates the setup of the \verb+mod_auth_gssapi+ module, including the new \texttt{Secure} mode for the \texttt{GssapiDelegCcacheUnique} parameter that was added as part of this project.
 
@@ -995,7 +1115,7 @@ SessionCookieName session path=/;httponly;samesite=strict
 Require valid-user
 \end{verbatim}
 
-\chapter*{Appendix 2: Django database router}
+\chapter{Django database router}
 \label{sec:appendix2}
 The code below shows the routing process for Django to determine which database to use for a given type of request:
 
@@ -1024,15 +1144,16 @@ class FileDBRouter:
 
     def allow_relation(self, obj1, obj2, **hints):
         """
-        Only allow relations within a database, not across multiple databases
+        Only allow relations within a database, not across multiple
+        databases
         """
         return ((obj1._meta.app_label == self.APP_LABEL) ==
                 (obj2._meta.app_label == self.APP_LABEL))
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         """
-        Only put files into the 'data' database, and everything else into the
-        'default' database
+        Only put files into the 'data' database, and everything else
+        into the 'default' database
         """
         if (app_label == self.APP_LABEL) and (db == self.DATA_DB):
             return True
@@ -1047,10 +1168,10 @@ Once this router is in place, the routing is transparent to the web app, which s
 
 (The code above is loosely based on several examples given in the Django documentation at \url{https://docs.djangoproject.com/en/3.1/topics/db/multi-db/}.)
 
-\chapter*{Appendix 3: \texttt{mod\_auth\_gssapi} Patch}
+\chapter{\texttt{mod\_auth\_gssapi} Patch}
 \label{sec:appendix3}
 
-The following \texttt{diff} extracts show some more detail on the changes made to the \verb+mod_auth_gssapi+ module.
+The following \texttt{diff} extracts (slightly altered for line length in this report) show more detail on the changes made to the \verb+mod_auth_gssapi+ module.
 
 Calling of the subroutine to create a random string:
 
@@ -1058,7 +1179,8 @@ Calling of the subroutine to create a random string:
 -    ccname = apr_psprintf(pool, "%s/%s-XXXXXX", dir, escaped);
 +    if (use_random) {
 +        const char *rand_string = get_random_string(16, req->pool);
-+        ccname = apr_psprintf(pool, "%s/%s-%s-XXXXXX", dir, escaped, rand_string);
++        ccname = apr_psprintf(pool, "%s/%s-%s-XXXXXX", dir, escaped,
++                              rand_string);
 +    } else {
 +        ccname = apr_psprintf(pool, "%s/%s-XXXXXX", dir, escaped);
 +    }
@@ -1069,7 +1191,8 @@ Implementing a multiple-choice option (rather than a simple on/off) flag:
 (Based on the style used elsewhere in Apache code, for example in the \texttt{AcceptPathInfo} option\cite{AcceptPathInfo-source})
 
 \begin{verbatim}
- static const char *mag_deleg_ccache_unique(cmd_parms *parms, void *mconfig,
+ static const char *mag_deleg_ccache_unique(cmd_parms *parms,
+                                            void *mconfig,
 -                                           int on)
 +                                           const char *arg)
  {
@@ -1089,13 +1212,14 @@ Implementing a multiple-choice option (rather than a simple on/off) flag:
 +        cfg->deleg_ccache_random = true;
 +    }
 +    else {
-+        return "GssapiDelegCcacheUnique must be set to on, off or secure";
++        return
++        "GssapiDelegCcacheUnique must be set to on, off or secure";
 +    }
      return NULL;
  }
 \end{verbatim}
 
-\chapter*{Appendix 4: HTTP Negotiate Protocol Trace}
+\chapter{HTTP Negotiate Protocol Trace}
 \label{sec:appendix4}
 
 \begin{verbatim}
@@ -1124,15 +1248,15 @@ $ curl -v --negotiate -u : krbsite.local/files/
 * Server auth using Negotiate with user ''
 > GET /files/ HTTP/1.1
 > Host: krbsite.local
-> Authorization: Negotiate YIICewYGKwYBBQUCoIICbzCCAmugDTALBgkqhkiG9xIBAgKigg...
+> Authorization: Negotiate YIICewYGKwYBBQUCoIICbzCCAmugDTALBgkqhkiG9...
 > User-Agent: curl/7.58.0
 > Accept: */*
 >
 < HTTP/1.1 200 OK
 < Date: Thu, 29 Apr 2021 16:21:40 GMT
 < Server: Apache/2.4.41 (Ubuntu)
-< WWW-Authenticate: Negotiate oYG3MIG0oAMKAQChCwYJKoZIhvcSAQICooGfBIGcYIGZBgkq...
-< Set-Cookie: session=MagBearerToken=fGZU6v8uKhalBbmvCLOYfeHsN5JLLTg3IgFflgCfX...;
+< WWW-Authenticate: Negotiate oYG3MIG0oAMKAQChCwYJKoZIhvcSAQICooGfBIG...
+< Set-Cookie: session=MagBearerToken=fGZU6v8uKhalBbmvCLOYfeHsN5JLLTg3...;
   path=/;httponly;samesite=strict
 < Cache-Control: no-cache, private
 < Content-Length: 2031
@@ -1144,4 +1268,6 @@ $ curl -v --negotiate -u : krbsite.local/files/
 \end{verbatim}
 [The page content now follows]
 
+\chapter{Project Proposal}
+\include{proposal}
 \end{document}
