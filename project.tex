@@ -28,6 +28,7 @@
 \usepackage{makecell}
 \usepackage{multicol}
 \usepackage{multirow}
+\usepackage{tablefootnote}
 
 % Allow inclusion of project proposal
 \usepackage{standalone}
@@ -45,7 +46,73 @@
 
 \begin{document}
 \pagenumbering{roman}
-\maketitle
+
+\begin{titlepage}
+  \rightline{\huge Daniel Carter}
+  \vfill
+  \begin{center}
+    \huge{
+      \textbf{Kerberos-based single sign-on with delegation for web applications}
+
+     Computer Science Tripos, Part II
+
+     Fitzwilliam College
+
+     2020-21
+    }
+  \end{center}
+  \vfill
+\end{titlepage}
+
+\section*{Declaration of Originality}
+I, Daniel Carter of Fitzwilliam College, being a candidate for Part II of the Computer Science Tripos, hereby declare that this dissertation and the work described in it are my own work, unaided except as may be specified below, and that the dissertation does not contain material that has already been used to any substantial extent for a comparable purpose.
+
+I am content for my dissertation to be made available to the students and staff of the University.
+
+Signed: Daniel Carter
+
+Date: TODO
+
+\section*{Acknowledgements}
+Thanks go to:
+\begin{itemize}
+\item
+  My supervisor, \textbf{Dr Markus Kuhn}, for proposing the original idea for this project, supporting me throughout the development process and giving advice on the dissertation
+\item
+  My Director of Studies, \textbf{Dr Robert Harle}, for offering general advice through the year and making comments on my draft dissertation
+\item
+  My overseers, \textbf{Professor Frank Stajano} and \textbf{Dr Amanda Prorok}, for advice in the project selection phase and feedback following the mid-project presentation
+\item
+  \textbf{Ruth Carter} (my mother), \textbf{Jack Parkinson} and \textbf{Julian Wreford} for reading the draft dissertation and making suggestions
+\end{itemize}
+
+\clearpage
+
+\chapter*{Proforma}
+
+\begin{table}[h]
+\begin{tabular}{l l}
+  Candidate number: & 2428G \\
+  Title: & Kerberos-based single sign-on with delegation for web applications \\
+  Examination: & Computer Science Tripos, Part II \\
+  Year: & 2020-21 \\
+  Word count: & TODO \tablefootnote{Counted using \TeX count} \\
+  Code line count: & 1057 \tablefootnote{Counted using \texttt{git diff --stat} against the initial state of each of the git repositories, and \texttt{wc -l} on the two Python test scripts} \\
+  Project Originator: & Dr Markus Kuhn \\
+  Project Supervisor: & Dr Markus Kuhn
+\end{tabular}
+\end{table}
+
+\section*{Original Aims}
+This project aimed to construct a Django-based web application that permits a user to present a Kerberos ticket for authentication, with the ticket being delegated to a database server such that the web server itself does not need permissions on the database. This would then be modularised so it could easily be used with any Django site, and an analysis done of the security and performance of the system. As possible extensions, I proposed to investigate using the same SQL server for web server logs (via a different Kerberos ticket), and the possibility of connecting to an NFS server.
+
+\section*{Work Completed}
+The success criteria were completed (although ultimately modifications to Django itself were not necessary, so a web interface to simplify the setup of the database permissions was instead constructed). I also implemented part of the software for the extension goal of storing web logs on the same database server.
+
+The project includes a demonstration web application as well a patches to PostgreSQL and Apache's \verb+mod_auth_gssapi+ module, and there was some interest from the PostgreSQL developer community in including the patch in a future release.
+
+\section*{Special Difficulties}
+Completed during the COVID-19 pandemic.
 
 \tableofcontents
 
@@ -56,7 +123,7 @@
 \label{sec:motivation}
 Many web applications are built around a database, which is used by the application framework to store user data and allow a user to view and edit it. In general, the user logs in using a username and password (which is checked by the web app framework itself), and the application then makes database queries on the user's behalf, processes the results, and displays them to the user in a suitable way.
 
-In this scenario, the application framework has the ability to read and write arbitrary data in the database, and the only thing which prevents a malicious user from accessing data for which they have no authorisation to is the application code itself. This is potentially problematic, since web app authors are often not security experts and may accidentally cause data to be visible to the wrong users. Some examples of how this can occur include:
+In this scenario, the application framework has the ability to read and write arbitrary data in the database, and the only thing which prevents a malicious user from accessing data for which they have no authorisation to is the application code itself. This is potentially problematic, since web app authors are often not security experts and may inadvertently cause data to be visible to users who should not be able to access it. Some examples of how this can occur include:
 
 \subsection{SQL Injection}
 \label{sec:sql_injection}
@@ -64,11 +131,11 @@ SQL injection is a form of command injection attack (which are currently number 
 \begin{verbatim}
 SELECT * FROM records WHERE username='$user';
 \end{verbatim}
-and replaces \verb+$user+ with a string that the user provides. However, with insufficient checking of parameters, a user can supply a string such as
+and replaces \verb+$user+ with a string that the user provides. However, if the parameters are not sufficiently checked, a user can supply a string such as
 \begin{verbatim}
 ' OR 1=1; --
 \end{verbatim}
-resulting in a total query of
+resulting in a database query of
 \begin{verbatim}
 SELECT * FROM records WHERE username='' OR 1=1; --';
 \end{verbatim}
@@ -91,12 +158,12 @@ The following diagram represents an example of a typical current setup, and the 
   \end{tikzpicture}
 \end{center}
 
-In the diagram above, \textbf{red nodes} represent the Trusted Computing Base (TCB) of the system (i.e.\ the set of components which could cause the whole system to be compromised if that component contained a security vulnerability). In this setup, the website itself is a part of the TCB since a vulnerability in it could allow an attacker to take over the system.
+In the diagram above, \textbf{red nodes} represent the Trusted Computing Base (TCB) of the system (i.e.\ the set of components which could cause the whole system to be compromised if that component contained a security vulnerability). In this setup, the website itself is a part of the TCB since a vulnerability here could allow an attacker to take over the system.
 
 In step 2, it is worth noting that the website can only steal data which is accessible to the user account used by the web app to log into the database. However, this is still likely to include the data of all users of the system since the web app needs legitimate access to user $A$'s data when $A$ logs into the system.
 
 \subsection{Master Password Leakage}
-There are many variations on master password leakage depending on exactly what was leaked, but such attacks usually enable any malicious user to arbitrarily read and write from the database. Since the web app itself has these capabilities, it usually has a single username and password for authentication with the database, and these are usually stored in a simple configuration file. If the webserver is misconfigured such that the configuration file is visible over the internet, or if the file is accidentally checked into a public source control repository, an attacker can read this file, connect to the database server and read out all the data.
+There are many variations of master password leakage depending on exactly what was leaked, but most such attacks enable any malicious user to arbitrarily read and write from the database. Since the web app itself has these capabilities, it usually has a single username and password for authentication with the database, and these are usually stored in a simple configuration file. If the webserver is misconfigured such that the configuration file is visible over the internet, or if the file is accidentally checked into a public source control repository, an attacker can read this file, connect to the database server and read out all the data.
 
 In a way, SQL injection is also a form of master password leakage even though the attacker does not actually see the master password; instead, they are able to abuse an application which holds a copy of that master password to perform malicious acts.
 
@@ -233,7 +300,7 @@ Despite seemingly being no better than $A$ simply giving a password to $X$ (so t
   Some limitations are placed on what can be done with the tickets. Although $X$ can use the TGT to get a service ticket to any other system $Y$ that $A$ can access, $Y$ does not automatically have the right to delegate this ticket further. If $Y$ does \textbf{not} have the \verb+ok-as-delegate+ flag set, then $X$ can \textit{access} $Y$ on $A$'s behalf but not allow $Y$ to perform actions for $A$ on some other server $Z$. If $Y$ is not well-trusted, this can be a significant benefit. Additionally, tickets sent in this way can be bound to IP addresses, to limit the risk that they are passed on to insecure other systems.
 \end{itemize}
 
-While the second of these advantages is significant, it may still not offer enough access control over the network. In particular, $A$ cannot give $X$ the ability to delegate to $Y$ without also giving $X$ the ability to delegate to \textbf{any} other service which $A$ has access to. In many cases this would be too great a risk; it may well be desirable to allow $X$ to fetch $A$'s work documents from $Y$ to display them in a web app, but not to allow $X$ to retrieve $A$'s financial records from another system $Z$ within the same Kerberos realm.
+While the second of these advantages is significant, it still may not offer enough access control over the network. In particular, $A$ cannot give $X$ the ability to delegate to $Y$ without also giving $X$ the ability to delegate to \textbf{any} other service which $A$ has access to. In many cases this would be too great a risk; it may well be desirable to allow $X$ to fetch $A$'s work documents from $Y$ to display them in a web app, but not to allow $X$ to retrieve $A$'s financial records from another system $Z$ within the same Kerberos realm.
 
 In this case, constrained delegation offers a far more controllable method of only allowing services to delegate tickets in particular ways, at the expense of a more complex setup for managing applications.
 
@@ -242,7 +309,7 @@ The \textit{Service for User to Proxy} (S4U2proxy) system is a Microsoft-designe
 
 Unlike with unconstrained delegation, here the ticket-granting ticket is not passed over to $X$; instead, $X$ is given a service ticket from $A$ as normal (to prove $A$'s identity and that $A$ wishes to connect to $X$). When $X$ needs to access $Y$ on behalf of $A$, $X$ \textit{submits the service ticket} to the KDC. If the permissions in the KDC are set appropriately, it is able to give $X$ a ticket to $Y$ on behalf of $A$.
 
-This requires a more complex setup of permission models in the KDC than simply a list of principals, since the KDC must now decide which services can delegate tickets to which others. As discussed in \autoref{sec:kerberos_backend}, an LDAB backend allows the relevant \texttt{krbAllowedToDelegateTo} permission to be set on the user\cite{KRB-DELEG}.
+This requires a more complex setup of permission models in the KDC than simply a list of principals, since the KDC must now decide which services can delegate tickets to which others. As discussed in \autoref{sec:kerberos_backend}, an LDAP backend allows the relevant \texttt{krbAllowedToDelegateTo} permission to be set on the user\cite{KRB-DELEG}.
 
 In addition to the advantages described above for unconstrained delegation, there are some further advantages here:
 
@@ -263,7 +330,7 @@ add: krbAllowedToDelegateTo
 krbAllowedToDelegateTo: postgres/krb.local@LOCAL
 \end{verbatim}
 
-Under Microsoft Active directory, a similar setting named \texttt{msDS-AllowedToDelegateTo} is available, and this can be used in effectively the same way as above to enable constrained delegation from one service to another\cite{MS-deleg-attribute}.
+Under Microsoft Active Directory, a similar setting named \texttt{msDS-AllowedToDelegateTo} is available, and this can be used in effectively the same way as above to enable constrained delegation from one service to another\cite{MS-deleg-attribute}.
 
 \subsection{S4U2self}
 This description is included here for completeness (because of its similar name) although it is \textbf{not} a true method of delegating tickets.
@@ -284,7 +351,7 @@ modprinc -ok_to_auth_as_delegate HTTP/krbsite.local@LOCAL
 
 \section{Storage of Credential Caches}
 \label{sec:storage_of_credential_caches}
-To avoid considerably slowing down website accesses (see \autoref{sec:credential_cacheing}), the web server must store local copies of client Kerberos tickets. Ignoring two Windows-specific mechanisms, MIT Kerberos offers five methods of storing credential caches\cite{MIT-ccache-types}:
+To avoid considerably slowing down website accesses (see \autoref{sec:credential_caching}), the web server must store local copies of client Kerberos tickets. Ignoring two Windows-specific mechanisms, MIT Kerberos offers five methods of storing credential caches\cite{MIT-ccache-types}:
 
 \begin{itemize}
 \item
@@ -335,7 +402,7 @@ PostgreSQL also allows rules to be created which effectively redefine actions on
 However, this is likely to introduce unnecessary complexity (particularly with ensuring that administrators can still access data as necessary, for example). For these reasons, the PostgreSQL documentation considers it ``better style to write a \texttt{CREATE VIEW} command than to create a real table and define an \texttt{ON SELECT} rule for it''\cite{postgres-CREATE_RULE}.
 
 \subsection{Row-level Security}
-The final method considered, and the one which turned out to be best-suited to this problem, was PostgreSQL's row-level security constructions. These allow policies (defined by the database owner) to determine who can view or modify which rows in the database, and is well-suited to tasks like this.
+The final method considered, and the one which turned out to be best-suited to this example web application, was PostgreSQL's row-level security constructions. These allow policies (defined by the database owner) to determine who can view or modify which rows in the database, and is well-suited to tasks like this.
 
 See \autoref{sec:implementing_database_access_control} for more information about how these were actually used.
 
@@ -353,6 +420,7 @@ There are three broad components to the setup of this project: the web server, t
   Finally, there are also a number of possible options for the \textbf{SQL server} running the database. Although my previous SQL experience was primarily using mySQL, PostgreSQL offers more advanced functionality in a number of areas (including flexibility in table security options) and so offers advantages for this project. It also offers built-in support for authenticating to the database using a Kerberos ticket, which is clearly of use here.
 \end{itemize}
 
+\section{Project Management}
 \subsection{Source Code Management}
 For the Django directory itself, running it as a git repository with commits pushed to GitHub provides both version control and backup. This was also checked out into a separate folder on my PC which was backed up to Dropbox, to provide additional layers of backup.
 
@@ -559,8 +627,8 @@ For ease of setup (since this is not a significant aspect of the project), this 
 
 Also included in the repository, but outside the \verb+django-code+ directory, are the two \textbf{patches} (provided as diffs against the existing projects) and a \verb+testing+ directory containing two Python scripts for performance evaluation and graph plotting respectively.
 
-\section{Credential Cacheing in the Web Server}
-\label{sec:credential_cacheing}
+\section{Credential Caching in the Web Server}
+\label{sec:credential_caching}
 When user $A$ provides a Kerberos ticket for service $X$ as part of the GSSAPI process, the ticket can either be discarded immediately following the completion of the request (including after any necessary delegation has occurred) or be cached by the server for future use.
 
 The first of these offers a ``purer'' Kerberos setup, since the web server does not need to store any state and can simply use a ticket provided by the user on each request. However, this approach significantly limits the performance of the system:
@@ -719,6 +787,8 @@ cursor.execute("""SELECT dst.table_name, dst.column_name
     [model_data['table'], model_data['primary_key']])
 \end{verbatim}
 
+(The \verb+FROM information_schema.constraint_column_usage src+ syntax would be written as \verb+FROM information_schema.constraint_column_usage AS src+ in some other SQL implementations.)
+
 The application then performs a further query to the \verb+information_schema+ table to identify columns in these candidate tables which could be used to store the user's identity in a permission element. Because Django itself has no knowledge of the database's users, these are simply stored as string values (\texttt{character} or \texttt{character varying} in PostgreSQL nomenclature) in the database:
 
 \begin{verbatim}
@@ -729,7 +799,7 @@ cursor.execute("""SELECT column_name
     [table])
 \end{verbatim}
 
-This therefore provides an easy-to-use interface to set up Kerberos-based access control to a site, without having to manually set up SQL permissions.
+This therefore provides \textbf{an easy-to-use interface to set up Kerberos-based access control to a site, without having to manually set up SQL permissions}.
 
 \section{PostgreSQL Patch to Specify Credential Cache}
 \label{sec:postgresql_patch}
@@ -871,7 +941,7 @@ This sequence of packets shows:
   Packet 21: the client receives the page contents as an HTTP response
 \end{itemize}
 
-Each of the following requests in the sequence of packets repeats this cycle: although the client already has the service ticket, it must still make an initial HTTP request, receive a response requesting authentication and send another HTTP request with the service ticket. This is clearly inefficient, and so session cookies (as described in \autoref{sec:credential_cacheing}) are used in this application.
+Each of the following requests in the sequence of packets repeats this cycle: although the client already has the service ticket, it must still make an initial HTTP request, receive a response requesting authentication and send another HTTP request with the service ticket. This is clearly inefficient, and so session cookies (as described in \autoref{sec:credential_caching}) are used in this application.
 
 Once session cookies are enabled, the sequence of packets appears as follows:
 
@@ -980,7 +1050,7 @@ An example of a (minor) data leak caused by this setup is that it is possible to
 \label{sec:theft_of_credential_caches}
 If a malicious user could execute a process on the web server (under the same system user account as the server application), that process would gain the same access to the credential cache directory that the web server application has.
 
-Because of the patch added to \verb+mod_auth_gssapi+ and the directory permissions being set as described in \autoref{sec:credential_cacheing}, a malicious user could only enumerate files in the credential cache directory by doing a brute-force search on filenames. Given that each ticket is only useful for a small length of time, adding a suitably long random string to the filename should ensure that this method of obtaining tickets is not viable. To note further mitigations of the risks of credential caches being stolen:
+Because of the patch added to \verb+mod_auth_gssapi+ and the directory permissions being set as described in \autoref{sec:credential_caching}, a malicious user could only enumerate files in the credential cache directory by doing a brute-force search on filenames. Given that each ticket is only useful for a small length of time, adding a suitably long random string to the filename should ensure that this method of obtaining tickets is not viable. To note further mitigations of the risks of credential caches being stolen:
 
 \begin{itemize}
 \item
@@ -1008,7 +1078,7 @@ Therefore, I measured the access times to reach the file browser main page (whic
 \item
   Database authentication with a master password (the typical real-world model)
 \item
-  Access via HTTP-Negotiate and delegated Kerberos tickets, using ticket cacheing on the web server and session cookies (as described in \autoref{sec:credential_cacheing}, and implemented in this project)
+  Access via HTTP-Negotiate and delegated Kerberos tickets, using ticket caching on the web server and session cookies (as described in \autoref{sec:credential_caching}, and implemented in this project)
 \item
   Access via HTTP-Negotiate and delegated Kerberos tickets, but \textbf{without} use of session cookies
 \end{itemize}
@@ -1041,7 +1111,7 @@ Each of these access times was recorded 200 times in succession to allow summary
   \hline
 \end{tabular}
 
-Note that the ``Kerberos without session cookies'' data \textbf{excludes} the first connection of the session, where the cookie is obtained.
+Note that the ``Kerberos with session cookies'' data \textbf{excludes} the first connection of the session, where the cookie is obtained.
 
 From the data above, there is a clear performance penalty from using HTTP negotiation without any form of session cookie, with the median access time rising from 20--45ms to over 200ms. There is also less significant, but noticeable, increase in access times when connecting from a remote location (particularly in the case of the maximum times, which would be expected given the possibility of packet loss or other connection issues).
 
