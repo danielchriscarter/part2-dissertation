@@ -95,14 +95,14 @@ Thanks go to:
 
 \chapter*{Proforma}
 
-\begin{table}[h]
+\begin{table}[ht]
 \begin{tabular}{l l}
   Candidate number: & 2428G \\
   Title: & Kerberos-based single sign-on with delegation for web applications \\
   Examination: & Computer Science Tripos, Part II \\
   Year: & 2020-21 \\
-  Word count: & 11,916 \tablefootnote{Counted using \TeX count, including footnotes and captions} \\
-  Code line count: & 1057 \tablefootnote{Counted using \texttt{git diff --stat} against the initial state of each of the git repositories, and \texttt{wc -l} on the two Python test scripts} \\
+  Word count: & 11,941 \tablefootnote{Counted using \TeX count, including footnotes and captions} \\
+  Code line count: & 1,106 \tablefootnote{Counted using \texttt{git diff --stat} against the initial state of each of the git repositories, and \texttt{wc -l} on the two Python test scripts} \\
   Project Originator: & Dr Markus Kuhn\cite{project-suggestion} \\
   Project Supervisor: & Dr Markus Kuhn
 \end{tabular}
@@ -148,7 +148,7 @@ which returns all users' records (since \verb+1=1+ is always true).
 
 \autoref{fig:sql_injection} represents an example of a typical current setup, and the problems that can be caused if an SQL injection vulnerability is present:
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \begin{tikzpicture}[node distance=2.5cm]
       \node (user) [plain] {Attacker};
@@ -178,7 +178,7 @@ In a way, SQL injection is also a form of master password leakage even though th
 
 To demonstrate the significance of this problem, a number of companies (such as GitGuardian\cite{GitGuardian}) exist simply to monitor online repositories for leaked security keys, and warn their owners. As a case in point, when setting up the test site for this project, the Django \texttt{settings.py} file initially contained a secret key that would allow an attacker to forge cryptographic signatures and so break the security of the application to an extent (but \textbf{not} gain full database access due to the application's structure -- see \autoref{sec:theft_of_secrets}). Although the key was moved outside the repository (and changed, so knowledge of the old secret key would be of no use to an attacker) before any files were made public, the mere existence of the secret key in a prior commit caused a warning email (\autoref{fig:gitguardian_alert}) to be sent to me by GitGuardian within 70 minutes of changing the repository's visibility:
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \includegraphics[scale=0.5]{01-gitguardian.png}
   \end{center}
@@ -204,7 +204,7 @@ The University's Raven authentication service is an example of an SSO system; nu
 \label{sec:project_summary}
 This project demonstrates an authentication system for web applications, such that \textbf{a user can authenticate to a web application using a Kerberos ticket, and the web application can use this ticket to obtain the user's data from a database}.
 
-Apart from the requirement that a user has a Kerberos ticket in the first place, this is set up to be completely transparent to the user -- the only action required is to visit the website and the authentication process is carried out automatically (with the minor caveat that Kerberos authentication must be specifically enabled in most web browsers, although in a corporate environment this could be done centrally).
+Apart from the requirement that a user has a Kerberos ticket in the first place, this is set up to be completely transparent to the user -- the only action required is to visit the website and the authentication process is carried out automatically (with the minor caveat that Kerberos authentication must be specifically enabled in most web browsers\cite{Kerberos-enable}, although in a corporate environment this could be done centrally).
 
 As a demonstration of this in practice, this project includes building an \textbf{example file-browser application} that performs all authentication and authorisation via Kerberos tickets and database permissions, rather than implementing the security in the web app.
 
@@ -226,7 +226,7 @@ The core Kerberos system and its extensions are described in a series of IETF RF
   A later RFC (RFC 4559\cite{RFC4559}) refers to a Windows-based system which allowed a user to log into a web application, from which a suitably equipped application could delegate the ticket to another system such as a database server. This was included by Microsoft in IIS 5.0 through adding a \textit{Negotiate} extension to the HTTP protocol for use with Kerberos, and permitted a user to log in to the website without needing a password as described in the aims for this project.
 \end{itemize}
 
-The \textit{HTTP Negotiate} extension was subsequently included in various open-source web browsers. It also has some support in the Apache web server, and this project's aim is effectively to replicate Microsoft's setup of a Kerberos-based single sign-on with delegation using an open-source web framework (Django), in conjunction with the Apache web server and any client web browser supporting the Negotiate extension.
+The \textit{HTTP Negotiate} extension has since been included in various open-source web browsers. It also has some support in the Apache web server, and this project's aim is effectively to replicate Microsoft's setup of a Kerberos-based single sign-on with delegation using an open-source web framework (Django), in conjunction with the Apache web server and any client web browser supporting the Negotiate extension.
 
 \chapter{Preparation}
 
@@ -477,7 +477,7 @@ The Django documentation\cite{Django-docs} was used as a reference and guide thr
 \subsection{Overall Structure}
 \autoref{fig:authentication_process} shows the overall structure of the authentication process.
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \begin{tikzpicture}[node distance=2.2cm]
       \node (user) [plain] {User};
@@ -511,7 +511,7 @@ The project demonstrates a web application that uses Kerberos authentication and
 
 In the example web app, the models are files and directories, plus associated tables to hold access permissions for both files and directories. \autoref{fig:entity-relationship} shows the database model as an entity-relationship diagram.
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \begin{tikzpicture}[node distance=3cm]
       \node[entity] (file) {File}
@@ -578,7 +578,7 @@ The core of the repository is a Django web app, which can both perform the neces
 
 \autoref{fig:repository_overview} shows the structure of the directories involved. The basic directory layout is as produced by the Django project setup procedure, with some files having ``stubs'' automatically generated by this process (it also provides a default \texttt{settings.py} and the short \texttt{manage.py} script which runs various application management steps).
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{multicols}{2}
     \dirtree{%
       .1 django-code.
@@ -944,7 +944,7 @@ After authenticating to the web server via Kerberos, administrative users with s
 \subsection{Database Setup}
 The database setup application first displays a welcome screen (\autoref{fig:setup_welcome}), showing the database name to be operated on (fetched from the Django configuration -- \verb+DELEG_DATABASE+ is a new option added to the \verb+settings.py+ file which specifies to the web app which database should be accessed via delegated ticket).
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \includegraphics[scale=0.5]{02-setup1.png}
   \end{center}
@@ -954,7 +954,7 @@ The database setup application first displays a welcome screen (\autoref{fig:set
 
 The next stage in the process (\autoref{fig:table_selection}) fetches data on the database tables from the Django configuration. It then queries the \verb+information_schema+ tables (see \autoref{sec:database_setup_application}) and presents a setup page for choosing which tables and fields should be used when implementing the row-level security policies.
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \includegraphics[width=\textwidth]{03-setup2.png}
   \end{center}
@@ -968,7 +968,7 @@ The user performing these steps does not need knowledge of Kerberos authenticati
 
 Finally, a ``completion'' screen is shown (\autoref{fig:setup_complete}, which would include any error messages from the database engine).
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \includegraphics[scale=0.5]{04-setup3.png}
   \end{center}
@@ -981,7 +981,7 @@ As a practical illustration of how the technology works, I developed a file brow
 
 The basic interface (\autoref{fig:browser_home}) shows a hierarchical directory structure with files and directories, and options to create new records:
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \includegraphics[scale=0.5]{05-browser1.png}
   \end{center}
@@ -991,7 +991,7 @@ The basic interface (\autoref{fig:browser_home}) shows a hierarchical directory 
 
 Each file and directory has a permissions interface (\autoref{fig:browser_permissions}) visible to the registered ``owner'' of that record, allowing that user to add or remove permission entries.
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \includegraphics[scale=0.5]{06-browser2-perms.png}
   \end{center}
@@ -1001,7 +1001,7 @@ Each file and directory has a permissions interface (\autoref{fig:browser_permis
 
 In addition, the file owner can easily update file contents, as in \autoref{fig:browser_file_edit} (other users with permission to access the file have read-only access -- this could easily be augmented to allow a more complex access control mechanism for assigning separate read/write permissions to users).
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \includegraphics[scale=0.5]{07-browser3-file-contents.png}
   \end{center}
@@ -1015,7 +1015,7 @@ This demonstrates \textbf{a usable application (with a simple interface for user
 \label{sec:protocol_execution}
 Using an approach without session cookies, a simple request to the webserver produces a sequence of packets such as in \autoref{fig:connect_no_cookie}.
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \includegraphics[width=\textwidth]{09-connect-no-cookie.png}
   \end{center}
@@ -1042,7 +1042,7 @@ Each of the following requests in the sequence of packets repeats this cycle: al
 
 Once session cookies are enabled, the sequence of packets appears in \autoref{fig:connect_cookie}.
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \includegraphics[width=\textwidth]{10-connect-cookie.png}
   \end{center}
@@ -1144,7 +1144,7 @@ query = "SELECT * FROM " + table + "
 
 This can trivially be exploited by passing a search term such as \verb+' OR 1=1;--+ (as detailed in \autoref{sec:sql_injection}), and the web app's response (\autoref{fig:browser_sql}) shows that it is indeed vulnerable to SQL injection:
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \includegraphics[scale=0.5]{08-browser4-sql.png}
   \end{center}
@@ -1157,19 +1157,16 @@ However, \textbf{this does not disclose any information which \texttt{user1} can
 \begin{quote}
 \begin{samepage}
 \begin{verbatim}
-filedb2=# SELECT owner, COUNT(*) AS TOTAL FROM files_file
-          GROUP BY owner;
- owner  | total
+filedb2=# SELECT owner, COUNT(*) FROM files_file GROUP BY owner;
+ owner  | count
 --------+-------
+ user2  |     3
  django |     6
- ***    |     2
  user1  |     1
 (3 rows)
 \end{verbatim}
 \end{samepage}
 \end{quote}
-
-(The ``\verb+***+'' entry was changed from the actual output to remove a personal identifier.)
 
 \fbox{
   \parbox{0.95\textwidth}{
@@ -1239,7 +1236,7 @@ Therefore, I measured the access times to reach the file browser main page (whic
 
 Each of these access times was recorded 200 times in succession to allow summary statistics (median and quartiles) to be calculated. I measured the connection times (in both cases to a VM on my laptop running the web server) from my laptop and from a Microsoft Azure VM via an SSH tunnel (as in \autoref{fig:performance_testing_setup}) to give some simulation of the effect of network latency.
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \begin{tikzpicture}[node distance=1cm and 4cm]
       \node (kdc) [draw, rounded corners, align=center] {KDC and\\database server\\(VM)};
@@ -1291,7 +1288,7 @@ From the data above, there is a clear performance penalty from using HTTP negoti
 
 To more easily visualise the data and analyse the performance of the system \textbf{with} session cookies enabled, I created box-plots (after removing outliers beyond $1.5 \times \mathrm{IQR}$ of the quartiles) of first three rows of data for each of the two connection sources in \autoref{fig:response_times_laptop} and \autoref{fig:response_times_azure}.
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \includegraphics[width=0.8\textwidth]{11-response-times-laptop.pdf}
   \end{center}
@@ -1299,7 +1296,7 @@ To more easily visualise the data and analyse the performance of the system \tex
   \label{fig:response_times_laptop}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \begin{center}
     \includegraphics[width=0.8\textwidth]{12-response-times-azure.pdf}
   \end{center}
@@ -1308,6 +1305,8 @@ To more easily visualise the data and analyse the performance of the system \tex
 \end{figure}
 
 From these plots, there is no indication of a reduction in performance compared with the use of a master database password (in fact the median values suggest a slight speed improvement, although the natural variation in the data means that the two approaches probably offer roughly equal performance in practice).
+
+In both sample sets, the \textbf{mean response time} for the ``Kerberos with session cookies'' approach was also below that of the ``master password'' approach. Full timing data is included in the \texttt{testing} directory of the code repository.
 
 Although there is the overhead of the initial request to obtain the session cookie before the response times above are achievable, the same would apply to any single sign-on system (where a user is normally redirected to an external server for authentication, as in the OAuth2 protocol). Therefore, \textbf{the performance overheads associated with this system should not be noticeably greater than in existing single sign-on systems}.
 
@@ -1332,7 +1331,7 @@ The process of developing the software, and discussions with my supervisor and t
 
 
 \begin{thebibliography}{99}
-\bibitem{project-suggestion} Markus Kuhn (2020): Ideas for Student Projects -- Kerberos-based single sign-on with delegation for web applications: \url{https://www.cl.cam.ac.uk/~mgk25/project-ideas/#http-gssapi} (accessed 12/05/2021)
+\bibitem{project-suggestion} Markus Kuhn (2020): Ideas for Student Projects -- Kerberos-based single sign-on with delegation for web applications: \url{https://www.cl.cam.ac.uk/~mgk25/project-ideas/#http-gssapi} (accessed 12/05/2021) [N.B. link contains a personal identifier]
 
 \bibitem{OWASP10} OWASP \textit{Top 10 Web Application Security Risks} list: \url{https://owasp.org/www-project-top-ten/} (accessed 21/10/2020)
 
@@ -1341,6 +1340,8 @@ The process of developing the software, and discussions with my supervisor and t
 \bibitem{GDPR} Data Protection Act 2018: Section 157: \url{https://www.legislation.gov.uk/ukpga/2018/12/section/157/enacted} (accessed 10/02/2021)
 
 \bibitem{Oracle-OAuth2} Oracle OAuth Guide: API Gateway OAuth 2.0 Authentication Flows: \url{https://docs.oracle.com/cd/E50612_01/doc.11122/oauth_guide/content/oauth_flows.html} (accessed 08/04/2021)
+
+\bibitem{Kerberos-enable} IBM Open Liberty Docs: Configuring SPNEGO authentication: \url{https://openliberty.io/docs/21.0.0.2/configuring-spnego-authentication.html#configure-client-app} (accessed 13/05/2021)
 
 \bibitem{RFC2478} Eric Baize and Denis Pinkas (December 1998), \textit{The Simple and Protected GSS-API Negotiation Mechanism} (RFC 2478): \url{https://tools.ietf.org/html/rfc2478} (accessed 22/04/2021)
 
