@@ -88,7 +88,7 @@ Thanks go to:
 \item
   My overseers, \textbf{Professor Frank Stajano} and \textbf{Dr Amanda Prorok}, for advice in the project selection phase and feedback following the mid-project presentation
 \item
-  \textbf{Ruth Carter} (my mother), \textbf{Jack Parkinson} and \textbf{Julian Wreford} for reading the draft dissertation and making suggestions
+  \textbf{Ruth Carter} (my mother), \textbf{Jack Parkinson}, \textbf{Ted While} and \textbf{Julian Wreford} for reading the draft dissertation and making suggestions
 \end{itemize}
 
 \clearpage
@@ -146,22 +146,26 @@ SELECT * FROM records WHERE username='' OR 1=1; --';
 \end{verbatim}
 which returns all users' records (since \verb+1=1+ is always true).
 
-The following diagram represents an example of a typical current setup, and the problems that can be caused if an SQL injection vulnerability is present:
+\autoref{fig:sql_injection} represents an example of a typical current setup, and the problems that can be caused if an SQL injection vulnerability is present:
 
-\begin{center}
-  \begin{tikzpicture}[node distance=2.5cm]
-    \node (user) [plain] {Attacker};
-    \node (webserver) [trusted, below of=user] {Website};
-    \node (database) [trusted, below of=webserver] {Database};
+\begin{figure}[h]
+  \begin{center}
+    \begin{tikzpicture}[node distance=2.5cm]
+      \node (user) [plain] {Attacker};
+      \node (webserver) [trusted, below of=user] {Website};
+      \node (database) [trusted, below of=webserver] {Database};
 
-    \draw [arrow, bend right] (user) edge node {\parbox{0.65\textwidth}{\textbf{1.} \\ Username: \texttt{\textquotesingle \ OR 1=1; --} \\ Password: *****}} (webserver);
+      \draw [arrow, bend right] (user) edge node {\parbox{0.65\textwidth}{\textbf{1.} \\ Username: \texttt{\textquotesingle \ OR 1=1; --} \\ Password: *****}} (webserver);
 
-    \draw [arrow, bend right] (webserver) edge node {\parbox{0.65\textwidth}{\textbf{2.} \\ \texttt{SELECT * FROM users \\ WHERE username = \textquotesingle\textquotesingle \\ OR 1=1; -- \textquotesingle}}} (database);
+      \draw [arrow, bend right] (webserver) edge node {\parbox{0.65\textwidth}{\textbf{2.} \\ \texttt{SELECT * FROM users \\ WHERE username = \textquotesingle\textquotesingle \\ OR 1=1; -- \textquotesingle}}} (database);
 
-    \draw [arrow, bend right] (database) edge node[right] {\textbf{3.} Here is \textbf{everyone's} data} (webserver);
-    \draw [arrow, bend right] (webserver) edge node[right] {\textbf{4.} Here is everyone's data} (user);
-  \end{tikzpicture}
-\end{center}
+      \draw [arrow, bend right] (database) edge node[right] {\textbf{3.} Here is \textbf{everyone's} data} (webserver);
+      \draw [arrow, bend right] (webserver) edge node[right] {\textbf{4.} Here is everyone's data} (user);
+    \end{tikzpicture}
+  \end{center}
+  \caption{SQL Injection}
+  \label{fig:sql_injection}
+\end{figure}
 
 \textbf{Red nodes} represent the \textbf{Trusted Computing Base} (TCB) of the system (the set of components which could cause the whole system to be compromised if that component contained a security vulnerability). In this setup, the website itself is a part of the TCB since a vulnerability here could allow an attacker to take over the system.
 
@@ -172,11 +176,15 @@ Master password leakage has many variations depending on exactly what was leaked
 
 In a way, SQL injection is also a form of master password leakage even though the attacker does not actually see the master password; instead, the attacker abuses an application which holds a copy of that master password.
 
-To demonstrate the significance of this problem, a number of companies (such as GitGuardian\cite{GitGuardian}) exist simply to monitor online repositories for leaked security keys, and warn their owners. As a case in point, when setting up the test site for this project, the Django \texttt{settings.py} file initially contained a secret key that would allow an attacker to forge cryptographic signatures and so break the security of the application to an extent (but \textbf{not} gain full database access due to the application's structure -- see \autoref{sec:theft_of_secrets}). Although the key was moved outside the repository (and changed, so knowledge of the old secret key would be of no use to an attacker) before any files were made public, the mere existence of the secret key in a prior commit caused a warning email to be sent to me by GitGuardian within 70 minutes of changing the repository's visibility:
+To demonstrate the significance of this problem, a number of companies (such as GitGuardian\cite{GitGuardian}) exist simply to monitor online repositories for leaked security keys, and warn their owners. As a case in point, when setting up the test site for this project, the Django \texttt{settings.py} file initially contained a secret key that would allow an attacker to forge cryptographic signatures and so break the security of the application to an extent (but \textbf{not} gain full database access due to the application's structure -- see \autoref{sec:theft_of_secrets}). Although the key was moved outside the repository (and changed, so knowledge of the old secret key would be of no use to an attacker) before any files were made public, the mere existence of the secret key in a prior commit caused a warning email (\autoref{fig:gitguardian_alert}) to be sent to me by GitGuardian within 70 minutes of changing the repository's visibility:
 
-\begin{center}
-  \includegraphics[scale=0.5]{01-gitguardian.png}
-\end{center}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[scale=0.5]{01-gitguardian.png}
+  \end{center}
+  \caption{GitGuardian alert email}
+  \label{fig:gitguardian_alert}
+\end{figure}
 
 Even though this service only offers after-the-fact detection (a genuinely leaked secret key must quickly be changed everywhere it was used, and the site may still have been compromised in the meantime), the fact that businesses exist to perform these scans, and seemingly scan all public GitHub repositories to alert their owners, indicates the severity of this issue.
 
@@ -247,6 +255,7 @@ The basic workings of the Kerberos protocol are as follows:
 The following listing shows a client (\verb+user1@LOCAL+) with both a TGT and a service ticket. The ticket in the first line (\verb+krbtgt/LOCAL@LOCAL+) is the \textit{ticket-granting ticket} which the client obtained when first authenticating to the KDC, and the second line contains a \textit{service ticket} (\verb+HTTP/krbsite.local@LOCAL+) to log in to the \verb+HTTP+ service on \verb+krbsite.local+ (i.e.\ to access the web page hosted on that server).
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 $ klist
 Ticket cache: FILE:/tmp/krb5cc_1000
@@ -258,6 +267,7 @@ Valid starting     Expires            Service principal
 05/05/21 14:54:25  06/05/21 00:54:18  HTTP/krbsite.local@LOCAL
 	renew until 06/05/21 14:54:18
 \end{verbatim}
+\end{samepage}
 \end{quote}
 
 As shown in the output above, Kerberos tickets have an initial expiry time and a ``renew until'' time. The latter allows a user to remain connected to a Kerberos system for longer without having to re-authenticate, but reduces the potential risk of an unattended ticket being usable later since an already-expired ticket cannot be renewed.
@@ -320,6 +330,7 @@ Unlike with unconstrained delegation, the ticket-granting ticket is not passed o
 This requires a more complex permission model in the KDC than simply a list of principals, since the KDC must now regulate when tickets can be delegated; as discussed in \autoref{sec:kerberos_backend}, an LDAP backend allows the relevant \texttt{krbAllowedToDelegateTo} permission to be set on the user\cite{KRB-DELEG}. The following pattern is therefore used on the LDAP server to allow delegation from the web server on \verb+krbsite.local+ to PostgreSQL running on \verb+krb.local+, by setting the \texttt{krbAllowedToDelegateTo} attribute on \verb+HTTP/krbsite.local+ to \verb+postgres/krb.local+:
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 dn: krbPrincipalName=HTTP/krbsite.local@LOCAL,cn=LOCAL
 ,cn=krbContainer,dc=local
@@ -327,6 +338,7 @@ changetype: modify
 add: krbAllowedToDelegateTo
 krbAllowedToDelegateTo: postgres/krb.local@LOCAL
 \end{verbatim}
+\end{samepage}
 \end{quote}
 
 Under Microsoft Active Directory, a similar setting named \texttt{msDS-AllowedToDelegateTo} is available, and this can be used in effectively the same way to enable constrained delegation from one service to another\cite{MS-deleg-attribute}.
@@ -396,6 +408,7 @@ Effectively, these are similar to Trusted Procedures in a Clark-Wilson security 
 Views allow a dynamically-generated table to be created out of data in existing tables. Syntax such as the following constructs a view which only has the calling user's data visible; users can then be granted access to this view and do not need any access to the original table. For web application purposes, it can be queried just like any other table.
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 CREATE VIEW my_files AS
 SELECT f.*
@@ -403,7 +416,9 @@ FROM files_file f, files_permission p
 WHERE f.id = p.file_id
 AND p.owner = user;
 \end{verbatim}
+\end{samepage}
 \end{quote}
+
 
 Write access is not directly available for views containing cross-table joins, but can be achieved either by using \texttt{ON INSERT} rules in the same way as the \texttt{ON SELECT} rules below, or by using SQL triggers\cite{postgres-CREATE_VIEW}.
 
@@ -460,84 +475,92 @@ The Django documentation\cite{Django-docs} was used as a reference and guide thr
 \section{Project Structure}
 
 \subsection{Overall Structure}
-The overall structure of the authentication process is as shown below.
+\autoref{fig:authentication_process} shows the overall structure of the authentication process.
 
-\begin{center}
-  \begin{tikzpicture}[node distance=2.2cm]
-    \node (user) [plain] {User};
-    \node (webserver) [untrusted, below of=user, yshift=-1cm] {Website};
-    \node (database) [trusted, below of=webserver] {Database};
-    \node (kdc) [trusted, left of=user, xshift=-4cm] {KDC};
+\begin{figure}[h]
+  \begin{center}
+    \begin{tikzpicture}[node distance=2.2cm]
+      \node (user) [plain] {User};
+      \node (webserver) [untrusted, below of=user, yshift=-1cm] {Website};
+      \node (database) [trusted, below of=webserver] {Database};
+      \node (kdc) [trusted, left of=user, xshift=-4cm] {KDC};
 
-    \draw [arrow, bend right] (user) edge node[above, xshift=2.5cm] {\parbox{0.5\textwidth}{\textbf{1.} \\ Username: \texttt{alice} \\ Password: \texttt{*****}}} (kdc);
+      \draw [arrow, bend right] (user) edge node[above, xshift=2.5cm] {\parbox{0.5\textwidth}{\textbf{1.} \\ Username: \texttt{alice} \\ Password: \texttt{*****}}} (kdc);
 
-    \draw [arrow, bend right] (kdc) edge node[above, yshift=-0.7cm] {\textbf{2.} Kerberos ticket} (user);
+      \draw [arrow, bend right] (kdc) edge node[above, yshift=-0.7cm] {\textbf{2.} Kerberos ticket} (user);
 
-    \draw [arrow, bend right] (user) edge node[left, yshift=-0.6cm] {\textbf{3.} Kerberos ticket} (webserver);
+      \draw [arrow, bend right] (user) edge node[left, yshift=-0.6cm] {\textbf{3.} Kerberos ticket} (webserver);
 
-    \draw [arrow, bend right] (webserver) edge node[left] {\parbox{0.3\textwidth}{\raggedright \textbf{4.} \texttt{SELECT} the records which this ticket can access (\textbf{delegated ticket} of Alice)}} (database);
+      \draw [arrow, bend right] (webserver) edge node[left] {\parbox{0.3\textwidth}{\raggedright \textbf{4.} \texttt{SELECT} the records which this ticket can access (\textbf{delegated ticket} of Alice)}} (database);
 
-    \draw [arrow, bend right] (database) edge node[right] {\textbf{5.} Here is Alice's data} (webserver);
-    \draw [arrow, bend right] (webserver) edge node[right] {\textbf{6.} Here is your data} (user);
-  \end{tikzpicture}
-\end{center}
+      \draw [arrow, bend right] (database) edge node[right] {\textbf{5.} Here is Alice's data} (webserver);
+      \draw [arrow, bend right] (webserver) edge node[right] {\textbf{6.} Here is your data} (user);
+    \end{tikzpicture}
+  \end{center}
+  \caption{The authentication process}
+  \label{fig:authentication_process}
+\end{figure}
 
 Since the same KDC can be used for many websites where all users have a login to the same Kerberos realm, the system also provides single sign-on functionality (using the Kerberos ticket as proof of identity). As described in \autoref{sec:kerberos_ticket_delegation}, none of the individual websites need access to the user's password, they cannot arbitrarily impersonate the user on other systems, and they cannot get any data from other systems which they have not been authorised to access. A website also cannot get data on behalf of users for whom it does not hold a live Kerberos ticket (so there is no way to access the records of users who have not used the system for a time interval at least as long as the expiry time of their tickets).
 
-Note that, unlike in the diagram in \autoref{sec:sql_injection}, the web application no longer has to be part of the trusted computing base; it merely passes on the Kerberos ticket which a user has provided and does not have any other method of accessing the data in the database. This means that an attack such as the one depicted in \autoref{sec:sql_injection} cannot take place.
+Note that, unlike in \autoref{fig:sql_injection}, the web application no longer has to be part of the trusted computing base; it merely passes on the Kerberos ticket which a user has provided and does not have any other method of accessing the data in the database. This means that an attack such as the one depicted in \autoref{fig:sql_injection} cannot take place.
 
 \subsection{Demonstration Web Application}
 \label{sec:demonstration_web_application}
 The project demonstrates a web application that uses Kerberos authentication and delegation to fetch data from a database and display it to the user, in the form of a basic file browser-type application. Django uses of a structure based on \textit{models} which correspond roughly to classes in object-oriented programming (and are represented by Python classes in the Django configuration), where each model has attributes that are set up as member variables of the class. When stored in a database, each model is a table, each object of a model is a row in that table and each attribute is a column.
 
-In the example web app, the models are files and directories, plus associated tables to hold access permissions for both files and directories. The database model can be represented in the following entity-relationship diagram:
+In the example web app, the models are files and directories, plus associated tables to hold access permissions for both files and directories. \autoref{fig:entity-relationship} shows the database model as an entity-relationship diagram.
 
-\begin{center}
-  \begin{tikzpicture}[node distance=3cm]
-    \node[entity] (file) {File}
-         [grow=up, sibling distance=2cm]
-         child {node[attribute, left of=file] {contents}}
-         child {node[attribute] {id}}
-         child {node[attribute] {name}}
-         child {node[attribute] {owner}};
+\begin{figure}[h]
+  \begin{center}
+    \begin{tikzpicture}[node distance=3cm]
+      \node[entity] (file) {File}
+           [grow=up, sibling distance=2cm]
+           child {node[attribute, left of=file] {contents}}
+           child {node[attribute] {id}}
+           child {node[attribute] {name}}
+           child {node[attribute] {owner}};
 
-         \node[relationship, right of=file, align=center] (file_location) {File \\ location};
+           \node[relationship, right of=file, align=center] (file_location) {File \\ location};
 
-         \node[entity, right of=file_location] (directory) {Directory}
-              [grow=up, sibling distance=2cm]
-              child {node[attribute] {id}}
-              child {node[attribute] {name}}
-              child {node[attribute] {owner}};
+           \node[entity, right of=file_location] (directory) {Directory}
+                [grow=up, sibling distance=2cm]
+                child {node[attribute] {id}}
+                child {node[attribute] {name}}
+                child {node[attribute] {owner}};
 
-              \node[relationship, right of=directory, align=center] (directory_parent) {Directory \\ parent};
+                \node[relationship, right of=directory, align=center] (directory_parent) {Directory \\ parent};
 
-              \node[relationship, below of=file, align=center] (file_permission) {File \\ permission};
+                \node[relationship, below of=file, align=center] (file_permission) {File \\ permission};
 
-              \node[entity, below of=file_permission, align=center] (file_permission_entry) {File Permission \\ Entry}
-                   [sibling distance=2cm]
-                   child {node[attribute] {id}}
-                   child {node[attribute] {owner}};
+                \node[entity, below of=file_permission, align=center] (file_permission_entry) {File Permission \\ Entry}
+                     [sibling distance=2cm]
+                     child {node[attribute] {id}}
+                     child {node[attribute] {owner}};
 
-                   \node[relationship, below of=directory, align=center] (directory_permission) {Directory \\ permission};
+                     \node[relationship, below of=directory, align=center] (directory_permission) {Directory \\ permission};
 
-                   \node[entity, below of=directory_permission, align=center] (directory_permission_entry) {Directory \\ Permission Entry}
-                        [sibling distance=2cm]
-                        child {node[attribute] {id}}
-                        child {node[attribute] {owner}};
+                     \node[entity, below of=directory_permission, align=center] (directory_permission_entry) {Directory \\ Permission Entry}
+                          [sibling distance=2cm]
+                          child {node[attribute] {id}}
+                          child {node[attribute] {owner}};
 
-                        \path (file) edge node [above] {$n$} (file_location);
-                        \path (file_location) edge node [above] {1} (directory);
+                          \path (file) edge node [above] {$n$} (file_location);
+                          \path (file_location) edge node [above] {1} (directory);
 
-                        \path (directory) edge node [above] {$n$} (directory_parent);
-                        \path (directory_parent) edge[bend left] node [below] {1} (directory);
+                          \path (directory) edge node [above] {$n$} (directory_parent);
+                          \path (directory_parent) edge[bend left] node [below] {1} (directory);
 
-                        \path (file) edge node [left] {1} (file_permission);
-                        \path (file_permission) edge node [left] {$n$} (file_permission_entry);
+                          \path (file) edge node [left] {1} (file_permission);
+                          \path (file_permission) edge node [left] {$n$} (file_permission_entry);
 
-                        \path (directory) edge node [left] {1} (directory_permission);
-                        \path (directory_permission) edge node [left] {$n$} (directory_permission_entry);
-  \end{tikzpicture}
-\end{center}
+                          \path (directory) edge node [left] {1} (directory_permission);
+                          \path (directory_permission) edge node [left] {$n$} (directory_permission_entry);
+    \end{tikzpicture}
+  \end{center}
+  \caption{Entity-relationship diagram for the example app}
+  \label{fig:entity-relationship}
+\end{figure}
 
 \subsection{Database Setup Application}
 The project also includes a component which performs the necessary setup tasks (setting up SQL permissions), so that all that is required for the user of the application is to:
@@ -553,64 +576,68 @@ The project also includes a component which performs the necessary setup tasks (
 \section{Repository Overview}
 The core of the repository is a Django web app, which can both perform the necessary setup steps to get the system working and (as a separate component) demonstrate the working of the system.
 
-The structure of the directories involved is shown below. The basic directory layout is as produced by the Django project setup procedure, with some files having ``stubs'' automatically generated by this process (it also provides a default \texttt{settings.py} and the short \texttt{manage.py} script which runs various application management steps).
+\autoref{fig:repository_overview} shows the structure of the directories involved. The basic directory layout is as produced by the Django project setup procedure, with some files having ``stubs'' automatically generated by this process (it also provides a default \texttt{settings.py} and the short \texttt{manage.py} script which runs various application management steps).
 
-\begin{multicols}{2}
-  \dirtree{%
-    .1 django-code.
-    .2 files.
-    .3 admin.py.
-    .3 apps.py.
-    .3 \hl{forms.py}.
-    .3 \_\_init\_\_.py.
-    .3 migrations.
-    .4 \_\_init\_\_.py.
-    .3 \hl{models.py}.
-    .3 templates.
-    .4 files.
-    .5 \hl{create.html}.
-    .5 \hl{dirview.html}.
-    .5 \hl{fileedit.html}.
-    .5 \hl{fileview.html}.
-    .5 \hl{index.html}.
-    .5 \hl{listing.html}.
-    .5 \hl{permissions.html}.
-    .5 \hl{rootdir.html}.
-    .5 \hl{search.html}.
-    .3 tests.py.
-    .3 urls.py.
-    .3 \hl{utils.py}.
-    .3 \hl{views.py}.
-    .2 (Continued in next column).
-  }
-  \columnbreak
-  \dirtree{%
-    .1 .
-    .2 krbsite.
-    .3 asgi.py.
-    .3 \hl{filedb\_router.py}.
-    .3 \_\_init\_\_.py.
-    .3 \hl{middleware.py}.
-    .3 settings.py.
-    .3 urls.py.
-    .3 wsgi.py.
-    .2 managedb.
-    .3 admin.py.
-    .3 apps.py.
-    .3 \hl{forms.py}.
-    .3 \_\_init\_\_.py.
-    .3 models.py.
-    .3 templates.
-    .4 managedb.
-    .5 index.html.
-    .5 \hl{result.html}.
-    .5 \hl{table\_mapping.html}.
-    .3 tests.py.
-    .3 urls.py.
-    .3 \hl{views.py}.
-    .2 manage.py.
-  }
-\end{multicols}
+\begin{figure}[h]
+  \begin{multicols}{2}
+    \dirtree{%
+      .1 django-code.
+      .2 files.
+      .3 admin.py.
+      .3 apps.py.
+      .3 \hl{forms.py}.
+      .3 \_\_init\_\_.py.
+      .3 migrations.
+      .4 \_\_init\_\_.py.
+      .3 \hl{models.py}.
+      .3 templates.
+      .4 files.
+      .5 \hl{create.html}.
+      .5 \hl{dirview.html}.
+      .5 \hl{fileedit.html}.
+      .5 \hl{fileview.html}.
+      .5 \hl{index.html}.
+      .5 \hl{listing.html}.
+      .5 \hl{permissions.html}.
+      .5 \hl{rootdir.html}.
+      .5 \hl{search.html}.
+      .3 tests.py.
+      .3 urls.py.
+      .3 \hl{utils.py}.
+      .3 \hl{views.py}.
+      .2 (Continued in next column).
+    }
+    \columnbreak
+    \dirtree{%
+      .1 .
+      .2 krbsite.
+      .3 asgi.py.
+      .3 \hl{filedb\_router.py}.
+      .3 \_\_init\_\_.py.
+      .3 \hl{middleware.py}.
+      .3 settings.py.
+      .3 urls.py.
+      .3 wsgi.py.
+      .2 managedb.
+      .3 admin.py.
+      .3 apps.py.
+      .3 \hl{forms.py}.
+      .3 \_\_init\_\_.py.
+      .3 models.py.
+      .3 templates.
+      .4 managedb.
+      .5 index.html.
+      .5 \hl{result.html}.
+      .5 \hl{table\_mapping.html}.
+      .3 tests.py.
+      .3 urls.py.
+      .3 \hl{views.py}.
+      .2 manage.py.
+    }
+  \end{multicols}
+  \caption{Repository overview}
+  \label{fig:repository_overview}
+\end{figure}
 
 The top-level directories represent the separation of ``components'' in the Django setup, with \texttt{krbsite} containing whole-system configuration, \texttt{files} containing the setup of the demonstration file manager application, and \texttt{managedb} having the code for the database setup application.
 
@@ -618,19 +645,21 @@ The primary code files are those highlighted above, with the most substantial co
 
 \texttt{files/utils.py} contains two helper functions called by \texttt{files/views.py}.
 
-The object model for the file browser application is defined in \texttt{files/models.py}, in the same way as for any other Django app. This includes both the actual data storage tables \texttt{Directory} and \texttt{File} and two permission tables (as shown in \autoref{sec:demonstration_web_application}) that are defined here so the web app can manipulate them using standard Django model operations which are fed back to the database. The \texttt{models.py} file under \texttt{managedb} does not contain any models since the database management app does not need to store any state itself -- it simply ``reaches in'' to the file management app's database structures to add security policies.
+The object model for the file browser application is defined in \texttt{files/models.py}, in the same way as for any other Django app. This includes both the actual data storage tables \texttt{Directory} and \texttt{File} and two permission tables (as shown in \autoref{fig:entity-relationship}) that are defined here so the web app can manipulate them using standard Django model operations which are fed back to the database. The \texttt{models.py} file under \texttt{managedb} does not contain any models since the database management app does not need to store any state itself -- it simply ``reaches in'' to the file management app's database structures to add security policies.
 
 The \texttt{tests.py} files are automatically created by Django for writing unit tests. However, this test setup is generally designed for testing application-specific features (e.g.\ whether the object model has been correctly defined) so is not especially useful for this project and was not used.
 
 The \texttt{templates} directories contain Django templates for HTML pages, which contain special commands (filled in by the rendering engine) such as the following:
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 {% for dir, subfiles, subdirs in directories %}
         {% include "files/listing.html"
            with root=dir files=subfiles dirs=subdirs %}
 {% endfor %}
 \end{verbatim}
+\end{samepage}
 \end{quote}
 
 Two of these also contain JavaScript functions, including one which populates one form field based on the value of another in \verb+managedb/templates/managedb/table_mapping.html+.
@@ -665,14 +694,16 @@ Further, \verb+mod_auth_gssapi+ is currently only designed to use file-based cac
 
 Although the best-supported by current systems, file caches are non-ideal in their default configuration because they are normally placed in a directory whose contents can be enumerated and read by any other process running as the same user. In this case, this means that a web app which was compromised to allow code execution in the context of a user's web app session could access tickets belonging to other website users who had logged in recently and whose tickets were still cached.
 
-However, clever use of the Unix directory permission model allows this limitation to be overcome. Since read (\texttt{r}) permissions on a directory allow the user to list files contained in it, and execute (\texttt{x}) permissions allow a user to \textit{traverse} the directory and read a file whose name is known, granting a user execute but not read permissions allows the filename to (in effect) become a password that can be used to access the file. The permission to list files in the directory is not provided, so it is not possible to obtain the filename unless it is separately provided. Therefore, \textbf{combining this with a ``secret'' filename that is not easily guessable (and is provided separately to the specific webserver process that needs it) can keep saved tickets secure from other processes running as the same user}.
+However, clever use of the Unix directory permission model allows this limitation to be overcome. Since read (\texttt{r}) permissions on a directory allow the user to list files contained in it, and execute (\texttt{x}) permissions allow a user to \textit{traverse} the directory and read a file whose name is known, granting execute but not read permissions allows the filename to (in effect) become a password that can be used to access the file. The permission to list files in the directory is not provided, so it is not possible to obtain the filename unless it is separately provided. Therefore, \textbf{combining this with a ``secret'' filename that is not easily guessable (and is provided separately to the specific webserver process that needs it) can keep saved tickets secure from other processes running as the same user}.
 
 \subsection{\texttt{mod\_auth\_gssapi} Patch}
 To make use of this, I added an option to the \texttt{GssapiDelegCcacheUnique} directive in \verb+mod_auth_gssapi+ which adds a random 16-character string to the credential cache name. When combined with \texttt{0300} directory permissions (i.e.\ \texttt{d-wx------} -- the owning user can write to the directory and traverse it to find files with known filenames, but not read the list of files in it), tickets can only be accessed by knowing the credential cache filename, which is passed to the web app and on to the Kerberos library via an environment variable. Therefore, one instance user's of the web app is not able to obtain tickets belonging to another.
 
 The most significant addition in this patch was a new function to generate the random string (using Apache's own random byte generator, but mapping it onto a string that can be included in a filename). I initially investigated using a base64-encoded series of random bytes as a way of representing the random data as a text string, but the ``standard'' base64 encoding used in the \verb+apr_base64+ Apache library does not produce a string suitable for inclusion in filenames because it includes the \verb+/+ character as part of the character set\cite{RFC4648}. A new library to include the \texttt{BASE64URL} encoding method was recently added to Apache\cite{Apache-base64-commit}, but was not yet available in the packaged Apache version I was using and would have reduced the utility of the patch by causing \verb+mod_auth_gssapi+ to require a more recent set of libraries to work. Since an actual standardised encoding of information is not required (just a random character sequence which can be part of a valid filename), I simply used 6 bits per byte of the random byte string and mapped these onto printable characters:
 
+
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 static char *get_random_string(apr_size_t length, apr_pool_t *pool)
 {
@@ -693,7 +724,9 @@ static char *get_random_string(apr_size_t length, apr_pool_t *pool)
     return output;
 }
 \end{verbatim}
+\end{samepage}
 \end{quote}
+
 
 Further details on the patch are shown in \autoref{sec:appendix3}.
 
@@ -707,6 +740,7 @@ While very flexible, \texttt{SECURITY DEFINER} functions cannot easily be integr
 However, it \textbf{can} be used to perform certain ``privileged'' operations as part of the access control checking procedure. I therefore implemented the following (template) function, which allows a user's privileges to be checked without the user having read access over the whole privilege table:
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 cursor.execute(f"""CREATE OR REPLACE FUNCTION {source_table}_permitted
 (object {source_table}.{source_column}%TYPE)
@@ -719,6 +753,7 @@ END;
 $$ LANGUAGE plpgsql
 SECURITY DEFINER;""")
 \end{verbatim}
+\end{samepage}
 \end{quote}
 
 The bracketed strings such as \verb+{source_table}+ are filled in by the setup application to reflect the specific database tables in use.
@@ -727,6 +762,7 @@ The bracketed strings such as \verb+{source_table}+ are filled in by the setup a
 While less significant than in the case of \texttt{SECURITY DEFINER} functions, views also introduce difficulties for interfacing with Django since each database table now needs two entries in the Django model setup (one for the table itself and one for the view). Using abstract classes and inheritance allows some reduction of duplication, but this is still non-ideal. For example, the following code (which I developed for an initial implementation of the web application but subsequently replaced) defines \texttt{File} (the actual model represented in a database \textbf{table}, but not visible to ordinary users) and \texttt{UserFile} (the SQL \textbf{view} that users can select from, which is marked as unmanaged to stop Django creating a full table for it). The \texttt{AbstractFile} class avoids repeating all the fields in both of the subclasses, but still makes for somewhat messy code:
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
  class AbstractFile(models.Model):
     id = models.AutoField(primary_key=True)
@@ -745,6 +781,7 @@ class UserFile(AbstractFile):
         managed = False
         db_table = 'my_files'
 \end{verbatim}
+\end{samepage}
 \end{quote}
 
 \subsection{Row-level Security}
@@ -754,6 +791,7 @@ The main database access control is done using row-level security policies on th
   \texttt{USING} policies work on existing rows to determine whether users are allowed to view and/or update the contents of a row. This is used for the main data tables (since the main concern is the confidentiality of file data), where the following lines of code allow users to view and update files for which they have permission records:
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 # Enable row-level security on the relevant table
 cursor.execute(f"""ALTER TABLE {source_table}
@@ -768,6 +806,7 @@ cursor.execute(f"""CREATE POLICY {source_table}_view_owner
                    ON {source_table}
                    USING ({source_owner_column} = session_user)""")
 \end{verbatim}
+\end{samepage}
 \end{quote}
 
   With a \texttt{USING} policy, a row which fails the policy is not visible to the user and so cannot be accessed.
@@ -776,6 +815,7 @@ cursor.execute(f"""CREATE POLICY {source_table}_view_owner
   \texttt{WITH CHECK} policies are designed to protect insertion of new rows. These are more suited to protecting the integrity of data (by stopping unauthorised additions) and so are used in this application for the permission tables. Since an attacker could otherwise maliciously insert permissions to allow access to arbitrary files, this is another critical part of the security model:
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 # Only allow users to set permissions where they are the owner
 cursor.execute(f"""CREATE POLICY {perm_table}_insert ON {perm_table}
@@ -783,6 +823,7 @@ cursor.execute(f"""CREATE POLICY {perm_table}_insert ON {perm_table}
                    (SELECT {source_column} FROM {source_table}
                    WHERE {source_owner_column} = session_user))""")
 \end{verbatim}
+\end{samepage}
 \end{quote}
 \end{itemize}
 
@@ -808,6 +849,7 @@ This application first gathers information from the user to arrange a ``matching
 Therefore, executing the following query on a given model (using the \verb+model_data+ parameters which are incorporated into the query) provides a set of candidate permission tables where such a foreign key exists:
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 cursor.execute("""SELECT dst.table_name, dst.column_name
     FROM information_schema.constraint_column_usage src,
@@ -820,6 +862,7 @@ cursor.execute("""SELECT dst.table_name, dst.column_name
     AND src.column_name = %s""",
     [model_data['table'], model_data['primary_key']])
 \end{verbatim}
+\end{samepage}
 \end{quote}
 
 (The \verb+FROM information_schema.constraint_column_usage src+ syntax would be written as \verb+FROM information_schema.constraint_column_usage AS src+ in some other SQL implementations.)
@@ -827,6 +870,7 @@ cursor.execute("""SELECT dst.table_name, dst.column_name
 The application then performs a further query to the \verb+information_schema+ table to identify columns in these candidate tables which could be used to store the user's identity in a permission element. Because Django itself has no knowledge of the database's users, these are simply stored as string values (\texttt{character} or \texttt{character varying} in PostgreSQL nomenclature) in the database:
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 cursor.execute("""SELECT column_name
     FROM information_schema.columns
@@ -834,6 +878,7 @@ cursor.execute("""SELECT column_name
     AND data_type LIKE 'character%%'""",
     [table])
 \end{verbatim}
+\end{samepage}
 \end{quote}
 
 This therefore provides \textbf{an easy-to-use interface to set up Kerberos-based access control to a site, without having to set up SQL permissions manually}.
@@ -847,16 +892,19 @@ Django's interactions with PostgreSQL are achieved using the \texttt{psycopg} li
 To specify the ticket which will be used for a Kerberos-based (GSSAPI) connection, the MIT Kerberos API provides a \verb+gss_krb5_ccache_name+ function which allows the user to specify a credential cache to use. The ``core'' addition to the \texttt{libpq} library is simply a call to this function at the appropriate point, specifying the location of the credential cache which is to be used:
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 if (ccache_name != NULL) {
         gss_krb5_ccache_name(&minor, ccache_name, NULL);
 }
 \end{verbatim}
+\end{samepage}
 \end{quote}
 
 As well as this, some further changes are needed to store the \texttt{ccache} name provided by the user with the rest of the connection information, until it is actually needed at the point of initiating the connection. Therefore, I added an additional field to the \texttt{PGconn} structure, with an associated new option in the \texttt{PQconninfoOptions} array:
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 #ifdef ENABLE_GSS
        {"ccache_name", NULL, NULL, NULL,
@@ -864,6 +912,7 @@ As well as this, some further changes are needed to store the \texttt{ccache} na
        offsetof(struct pg_conn, ccache_name)},
 #endif
 \end{verbatim}
+\end{samepage}
 \end{quote}
 
 The \verb+#ifdef+ macro allows the compiler of PostgreSQL to choose (at compile time) whether GSSAPI support will be included in the build or not.
@@ -893,60 +942,88 @@ Since this project was intended to provide a configuration which is easy to set 
 After authenticating to the web server via Kerberos, administrative users with sufficient PostgreSQL privileges can set up access control policies via the database setup application, and all users with appropriate permissions can view and edit ``files'' on the system. The actual authentication process is done by the browser and is transparent to the user (see \autoref{sec:protocol_execution}).
 
 \subsection{Database Setup}
-The database setup application first displays a welcome screen, showing the database name to be operated on (fetched from the Django configuration -- \verb+DELEG_DATABASE+ is a new option added to the \verb+settings.py+ file which specifies to the web app which database should be accessed via delegated ticket):
+The database setup application first displays a welcome screen (\autoref{fig:setup_welcome}), showing the database name to be operated on (fetched from the Django configuration -- \verb+DELEG_DATABASE+ is a new option added to the \verb+settings.py+ file which specifies to the web app which database should be accessed via delegated ticket).
 
-\begin{center}
-  \includegraphics[scale=0.5]{02-setup1.png}
-\end{center}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[scale=0.5]{02-setup1.png}
+  \end{center}
+  \caption{Setup welcome screen}
+  \label{fig:setup_welcome}
+\end{figure}
 
-The next stage in the process fetches data on the database tables from the Django configuration. It then queries the \verb+information_schema+ tables (see \autoref{sec:database_setup_application}) and presents a setup page for choosing which tables and fields should be used when implementing the row-level security policies:
+The next stage in the process (\autoref{fig:table_selection}) fetches data on the database tables from the Django configuration. It then queries the \verb+information_schema+ tables (see \autoref{sec:database_setup_application}) and presents a setup page for choosing which tables and fields should be used when implementing the row-level security policies.
 
-\begin{center}
-  \includegraphics[width=\textwidth]{03-setup2.png}
-\end{center}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[width=\textwidth]{03-setup2.png}
+  \end{center}
+  \caption{Table selection}
+  \label{fig:table_selection}
+\end{figure}
 
 Note the access control to this page is not critical (although probably desirable to avoid confusing users). If an unauthorised user attempts to access this page, there should not be any tables listed here (as the warning at the bottom of the previous image describes) due to insufficient privileges on the \verb+information_schema+ tables. Even if a user does have this access but is not authorised to create database policies, the following step will simply fail with a database permissions error. This is another illustration of the advantages of this approach over a traditional web application setup -- \textbf{as long as the database access rights are set appropriately, the web app does not need extra security protection mechanisms}.
 
 The user performing these steps does not need knowledge of Kerberos authentication, and since the application only displays tables which have appropriate foreign-key relationships in the database (see \autoref{sec:database_setup_application}), the potential for choosing an incorrect table is limited. Compared with manually creating the access control rules using SQL statements, this system is far more straightforward to set up.
 
-Finally, a ``completion'' screen is shown (which would include any error messages from the database engine):
+Finally, a ``completion'' screen is shown (\autoref{fig:setup_complete}, which would include any error messages from the database engine).
 
-\begin{center}
-  \includegraphics[scale=0.5]{04-setup3.png}
-\end{center}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[scale=0.5]{04-setup3.png}
+  \end{center}
+  \caption{Setup complete}
+  \label{fig:setup_complete}
+\end{figure}
 
 \subsection{Demonstration Application (File Browser)}
 As a practical illustration of how the technology works, I developed a file browser application allowing a user to create, view and edit ``files'' (which, for demonstration purposes, are simple text entries stored in the database) and assign permissions to other users.
 
-The basic interface shows a hierarchical directory structure with files and directories, and options to create new records:
+The basic interface (\autoref{fig:browser_home}) shows a hierarchical directory structure with files and directories, and options to create new records:
 
-\begin{center}
-  \includegraphics[scale=0.5]{05-browser1.png}
-\end{center}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[scale=0.5]{05-browser1.png}
+  \end{center}
+  \caption{File browser homepage}
+  \label{fig:browser_home}
+\end{figure}
 
-Each file and directory has a permissions interface visible to the registered ``owner'' of that record, allowing that user to add or remove permission entries:
+Each file and directory has a permissions interface (\autoref{fig:browser_permissions}) visible to the registered ``owner'' of that record, allowing that user to add or remove permission entries.
 
-\begin{center}
-  \includegraphics[scale=0.5]{06-browser2-perms.png}
-\end{center}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[scale=0.5]{06-browser2-perms.png}
+  \end{center}
+  \caption{Permissions editing interface}
+  \label{fig:browser_permissions}
+\end{figure}
 
-In addition, file contents can easily be updated by the file owner (other users with permission to access the file have read-only access -- this could easily be augmented to allow a more complex access control mechanism for assigning separate read/write permissions to users):
+In addition, the file owner can easily update file contents, as in \autoref{fig:browser_file_edit} (other users with permission to access the file have read-only access -- this could easily be augmented to allow a more complex access control mechanism for assigning separate read/write permissions to users).
 
-\begin{center}
-  \includegraphics[scale=0.5]{07-browser3-file-contents.png}
-\end{center}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[scale=0.5]{07-browser3-file-contents.png}
+  \end{center}
+  \caption{File editing interface}
+  \label{fig:browser_file_edit}
+\end{figure}
 
 This demonstrates \textbf{a usable application (with a simple interface for users) that works entirely by using and delegating Kerberos tickets, as described in the success criteria}.
 
 \section{Protocol Execution}
 \label{sec:protocol_execution}
-Using an approach without session cookies, a simple request to the webserver produces a sequence of packets such as the following:
+Using an approach without session cookies, a simple request to the webserver produces a sequence of packets such as in \autoref{fig:connect_no_cookie}.
 
-\begin{center}
-  \includegraphics[width=\textwidth]{09-connect-no-cookie.png}
-\end{center}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[width=\textwidth]{09-connect-no-cookie.png}
+  \end{center}
+  \caption{Packet sequence \textbf{without} session cookies}
+  \label{fig:connect_no_cookie}
+\end{figure}
 
-This sequence of packets shows:
+The sequence of packets in \autoref{fig:connect_no_cookie} shows:
 
 \begin{itemize}
 \item
@@ -963,11 +1040,15 @@ This sequence of packets shows:
 
 Each of the following requests in the sequence of packets repeats this cycle: although the client already has the service ticket, it must still make an initial HTTP request, receive a response requesting authentication and send another HTTP request with the service ticket. This is clearly inefficient, and so session cookies (as described in \autoref{sec:credential_caching}) are used in this application.
 
-Once session cookies are enabled, the sequence of packets appears as follows:
+Once session cookies are enabled, the sequence of packets appears in \autoref{fig:connect_cookie}.
 
-\begin{center}
-  \includegraphics[width=\textwidth]{10-connect-cookie.png}
-\end{center}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[width=\textwidth]{10-connect-cookie.png}
+  \end{center}
+  \caption{Packet sequence \textbf{with} session cookies}
+  \label{fig:connect_cookie}
+\end{figure}
 
 The initial exchange is effectively identical to the previous setup. However, the HTTP response in packet 25 now includes a session cookie, which is included by the browser in the subsequent requests. The client can then request resources as ``standard'' HTTP requests (with no need to repeat the negotiation process), and so the efficiency of the system is increased (see \autoref{sec:performance_evaluation}).
 
@@ -1053,21 +1134,28 @@ As the most significant aspect of this technology is its security implications, 
 The search feature of the demonstration app helps demonstrate the security of the Kerberos delegation approach in that it contains a (deliberate) SQL injection vulnerability. The search function performs the following query (where \texttt{term} is user-provided):
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 query = "SELECT * FROM " + table + "
          WHERE CONTENTS LIKE '%%" + term + "%%'"
 \end{verbatim}
+\end{samepage}
 \end{quote}
 
-This can trivially be exploited by passing a search term such as \verb+' OR 1=1;--+ (as detailed in \autoref{sec:sql_injection}), and the web app's response shows that it is indeed vulnerable to SQL injection:
+This can trivially be exploited by passing a search term such as \verb+' OR 1=1;--+ (as detailed in \autoref{sec:sql_injection}), and the web app's response (\autoref{fig:browser_sql}) shows that it is indeed vulnerable to SQL injection:
 
-\begin{center}
-  \includegraphics[scale=0.5]{08-browser4-sql.png}
-\end{center}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[scale=0.5]{08-browser4-sql.png}
+  \end{center}
+  \caption{SQL injection in the file browser app}
+  \label{fig:browser_sql}
+\end{figure}
 
 However, \textbf{this does not disclose any information which \texttt{user1} cannot access anyway}. Counting all files in the database (running the count as the database super-user) shows that there are actually many more files than were extracted using the SQL injection:
 
 \begin{quote}
+\begin{samepage}
 \begin{verbatim}
 filedb2=# SELECT owner, COUNT(*) AS TOTAL FROM files_file
           GROUP BY owner;
@@ -1078,6 +1166,7 @@ filedb2=# SELECT owner, COUNT(*) AS TOTAL FROM files_file
  user1  |     1
 (3 rows)
 \end{verbatim}
+\end{samepage}
 \end{quote}
 
 (The ``\verb+***+'' entry was changed from the actual output to remove a personal identifier.)
@@ -1148,23 +1237,27 @@ Therefore, I measured the access times to reach the file browser main page (whic
   Access via HTTP-Negotiate and delegated Kerberos tickets, but \textbf{without} use of session cookies
 \end{itemize}
 
-Each of these access times was recorded 200 times in succession to allow summary statistics (median and quartiles) to be calculated. I measured the connection times (in both cases to a VM on my laptop running the web server) from my laptop and from a Microsoft Azure VM via an SSH tunnel (shown below) to give some simulation of the effect of network latency.
+Each of these access times was recorded 200 times in succession to allow summary statistics (median and quartiles) to be calculated. I measured the connection times (in both cases to a VM on my laptop running the web server) from my laptop and from a Microsoft Azure VM via an SSH tunnel (as in \autoref{fig:performance_testing_setup}) to give some simulation of the effect of network latency.
 
-\begin{center}
-  \begin{tikzpicture}[node distance=1cm and 4cm]
-    \node (kdc) [draw, rounded corners, align=center] {KDC and\\database server\\(VM)};
-    \node (laptop_label) [below=of kdc] {Laptop};
-    \node (webserver) [draw, rounded corners, align=center, below=of laptop_label] {Web server\\(VM)};
-    \node (laptop) [draw, rounded corners, fit=(kdc) (laptop_label) (webserver)] {};
-    \node (internet) [cloud, draw, align=center, left=of laptop_label] {SSH tunnel\\over internet};
-    \node (azure) [draw, rounded corners, left=of internet] {Azure VM};
+\begin{figure}[h]
+  \begin{center}
+    \begin{tikzpicture}[node distance=1cm and 4cm]
+      \node (kdc) [draw, rounded corners, align=center] {KDC and\\database server\\(VM)};
+      \node (laptop_label) [below=of kdc] {Laptop};
+      \node (webserver) [draw, rounded corners, align=center, below=of laptop_label] {Web server\\(VM)};
+      \node (laptop) [draw, rounded corners, fit=(kdc) (laptop_label) (webserver)] {};
+      \node (internet) [cloud, draw, align=center, left=of laptop_label] {SSH tunnel\\over internet};
+      \node (azure) [draw, rounded corners, left=of internet] {Azure VM};
 
-    \draw (azure) edge [line width=3pt] node {} (internet);
-    \draw (internet) [line width=3pt] edge node {} (kdc);
-    \draw (internet) [line width=3pt] edge node {} (webserver);
-    \draw (kdc) edge [line width=3pt, transform canvas={xshift=1cm}] node {} (webserver);
-  \end{tikzpicture}
-\end{center}
+      \draw (azure) edge [line width=3pt] node {} (internet);
+      \draw (internet) [line width=3pt] edge node {} (kdc);
+      \draw (internet) [line width=3pt] edge node {} (webserver);
+      \draw (kdc) edge [line width=3pt, transform canvas={xshift=1cm}] node {} (webserver);
+    \end{tikzpicture}
+  \end{center}
+  \caption{Performance testing setup for Azure VM}
+  \label{fig:performance_testing_setup}
+\end{figure}
 
 \subsection*{Response Times (milliseconds)}
 \begin{tabular}{|l|l|l|l|l|l|l|}
@@ -1196,15 +1289,23 @@ Note that the ``Kerberos with session cookies'' data \textbf{excludes} the first
 
 From the data above, there is a clear performance penalty from using HTTP negotiation without any form of session cookie, with the median access time rising from 20--45ms to over 200ms. There is also less significant, but noticeable, increase in access times when connecting from a remote location (particularly in the case of the maximum times, which would be expected given the possibility of packet loss or other connection issues).
 
-To more easily visualise the data and analyse the performance of the system \textbf{with} session cookies enabled, I created box-plots (after removing outliers beyond $1.5 \times \mathrm{IQR}$ of the quartiles) of first three rows of data for each of the two connection sources:
+To more easily visualise the data and analyse the performance of the system \textbf{with} session cookies enabled, I created box-plots (after removing outliers beyond $1.5 \times \mathrm{IQR}$ of the quartiles) of first three rows of data for each of the two connection sources in \autoref{fig:response_times_laptop} and \autoref{fig:response_times_azure}.
 
-\begin{center}
-  \includegraphics[width=0.8\textwidth]{11-response-times-laptop.pdf}
-\end{center}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[width=0.8\textwidth]{11-response-times-laptop.pdf}
+  \end{center}
+  \caption{Response times from laptop}
+  \label{fig:response_times_laptop}
+\end{figure}
 
-\begin{center}
-  \includegraphics[width=0.8\textwidth]{12-response-times-azure.pdf}
-\end{center}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[width=0.8\textwidth]{12-response-times-azure.pdf}
+  \end{center}
+  \caption{Response times from Azure VM}
+  \label{fig:response_times_azure}
+\end{figure}
 
 From these plots, there is no indication of a reduction in performance compared with the use of a master database password (in fact the median values suggest a slight speed improvement, although the natural variation in the data means that the two approaches probably offer roughly equal performance in practice).
 
