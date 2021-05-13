@@ -82,7 +82,7 @@ Date: 13th May 2021
 Thanks go to:
 \begin{itemize}
 \item
-  My supervisor, \textbf{Dr Markus Kuhn}, for proposing the original idea for this project, supporting me throughout the development process and giving advice on the dissertation
+  My supervisor, \textbf{Dr Markus Kuhn}, for proposing the original idea for this project, supporting and advising me throughout the development process and giving advice on the dissertation
 \item
   My Director of Studies, \textbf{Dr Robert Harle}, for offering general advice through the year and making comments on my draft dissertation
 \item
@@ -114,7 +114,7 @@ This project aimed to construct a Django-based web application that permits a us
 \section*{Work Completed}
 The success criteria were completed (although ultimately modifications to Django itself were not necessary, so a web interface to simplify the setup of the database permissions was instead constructed). I also implemented part of the software for the extension goal of storing web logs on the same database server.
 
-The project includes a demonstration web application as well a patches to PostgreSQL and Apache's \verb+mod_auth_gssapi+ module. There was some interest from the PostgreSQL developer community in including the patch in a future release, and I have also had discussions with the \verb+mod_auth_gssapi+ maintainer.
+The project includes a demonstration web application as well as patches to PostgreSQL and Apache's \verb+mod_auth_gssapi+ module. There was some interest from the PostgreSQL developer community in including the patch in a future release, and I have also had discussions with the \verb+mod_auth_gssapi+ maintainer.
 
 \section*{Special Difficulties}
 Completed during the COVID-19 pandemic.
@@ -1009,7 +1009,11 @@ In addition, the file owner can easily update file contents, as in \autoref{fig:
   \label{fig:browser_file_edit}
 \end{figure}
 
-This demonstrates \textbf{a usable application (with a simple interface for users) that works entirely by using and delegating Kerberos tickets, as described in the success criteria}.
+\fbox{
+  \parbox{0.95\textwidth}{
+    This demonstrates \textbf{a usable application (with a simple interface for users) that works entirely by using and delegating Kerberos tickets, as described in the success criteria}.
+  }
+}
 
 \section{Protocol Execution}
 \label{sec:protocol_execution}
@@ -1073,8 +1077,8 @@ filedb2=# \dp
                                    |          | =rU/django            |
  files_directory                   | table    | django=arwdDxt/django+| files_directory_view (r):                               +
                                    |          | =arw/django           |   (u): ( SELECT files_directory_permitted(
-                                                                                 files_directory.id)
-                                                                                 AS files_directory_permitted)                  +
+                                   |          |                       |          files_directory.id)
+                                   |          |                       |          AS files_directory_permitted)                  +
                                    |          |                       | files_directory_view_owner:                             +
                                    |          |                       |   (u): ((owner)::text = SESSION_USER)                   +
                                    |          |                       | files_directory_insert (a):                             +
@@ -1087,8 +1091,8 @@ filedb2=# \dp
                                    |          |                       |   WHERE ((files_directory.owner)::text = SESSION_USER)))+
                                    |          |                       | files_directory_permission_view (r):                    +
                                    |          |                       |   (u): ( SELECT files_directory_permitted(
-                                                                                 files_directory_permission.directory_id)
-                                                                                 AS files_directory_permitted)                  +
+                                   |          |                       |          files_directory_permission.directory_id)
+                                   |          |                       |          AS files_directory_permitted)                  +
                                    |          |                       | files_directory_permission_insert (a):                  +
                                    |          |                       |   (c): (directory_id IN ( SELECT files_directory.id     +
                                    |          |                       |    FROM files_directory                                 +
@@ -1097,7 +1101,7 @@ filedb2=# \dp
                                    |          | =rU/django            |
  files_file                        | table    | django=arwdDxt/django+| files_file_view (r):                                    +
                                    |          | =arw/django           |   (u): ( SELECT files_file_permitted(files_file.id)
-                                                                                 AS files_file_permitted)                       +
+                                   |          |                       |          AS files_file_permitted)                       +
                                    |          |                       | files_file_view_owner:                                  +
                                    |          |                       |   (u): ((owner)::text = SESSION_USER)                   +
                                    |          |                       | files_file_insert (a):                                  +
@@ -1110,8 +1114,8 @@ filedb2=# \dp
                                    |          |                       |   WHERE ((files_file.owner)::text = SESSION_USER)))     +
                                    |          |                       | files_permission_view (r):                              +
                                    |          |                       |   (u): ( SELECT files_file_permitted(
-                                                                                 files_permission.file_id)
-                                                                                 AS files_file_permitted)                       +
+                                   |          |                       |          files_permission.file_id)
+                                   |          |                       |          AS files_file_permitted)                       +
                                    |          |                       | files_permission_insert (a):                            +
                                    |          |                       |   (c): (file_id IN ( SELECT files_file.id               +
                                    |          |                       |    FROM files_file                                      +
@@ -1310,7 +1314,11 @@ In both sample sets, the \textbf{mean response time} for the ``Kerberos with ses
 
 Although there is the overhead of the initial request to obtain the session cookie before the response times above are achievable, the same would apply to any single sign-on system (where a user is normally redirected to an external server for authentication, as in the OAuth2 protocol). Therefore, \textbf{the performance overheads associated with this system should not be noticeably greater than in existing single sign-on systems}.
 
-\textbf{The project demonstrates an application using delegated Kerberos tickets for secure access to a database, with no noticeable performance penalty}.
+\fbox{
+  \parbox{0.95\textwidth}{
+    \textbf{The project demonstrates an application using delegated Kerberos tickets for secure access to a database, with no noticeable performance penalty}.
+  }
+}
 
 \chapter{Conclusion}
 \section{Summary of Work Completed}
