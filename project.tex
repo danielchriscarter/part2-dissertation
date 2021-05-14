@@ -101,7 +101,7 @@ Thanks go to:
   Title: & Kerberos-based single sign-on with delegation for web applications \\
   Examination: & Computer Science Tripos, Part II \\
   Year: & 2020-21 \\
-  Word count: & 11,941 \tablefootnote{Counted using \TeX count, including footnotes and captions} \\
+  Word count: & 11,942 \tablefootnote{Counted using \TeX count, including footnotes and captions} \\
   Code line count: & 1,106 \tablefootnote{Counted using \texttt{git diff --stat} against the initial state of each of the git repositories, and \texttt{wc -l} on the two Python test scripts} \\
   Project Originator: & Dr Markus Kuhn\cite{project-suggestion} \\
   Project Supervisor: & Dr Markus Kuhn
@@ -503,7 +503,7 @@ The Django documentation\cite{Django-docs} was used as a reference and guide thr
 
 Since the same KDC can be used for many websites where all users have a login to the same Kerberos realm, the system also provides single sign-on functionality (using the Kerberos ticket as proof of identity). As described in \autoref{sec:kerberos_ticket_delegation}, none of the individual websites need access to the user's password, they cannot arbitrarily impersonate the user on other systems, and they cannot get any data from other systems which they have not been authorised to access. A website also cannot get data on behalf of users for whom it does not hold a live Kerberos ticket (so there is no way to access the records of users who have not used the system for a time interval at least as long as the expiry time of their tickets).
 
-Note that, unlike in \autoref{fig:sql_injection}, the web application no longer has to be part of the trusted computing base; it merely passes on the Kerberos ticket which a user has provided and does not have any other method of accessing the data in the database. This means that an attack such as the one depicted in \autoref{fig:sql_injection} cannot take place.
+Note that, unlike in \autoref{fig:sql_injection}, \textbf{the web application no longer has to be part of the trusted computing base}; it merely passes on the Kerberos ticket which a user has provided and does not have any other method of accessing the data in the database. This means that an attack such as the one depicted in \autoref{fig:sql_injection} cannot take place.
 
 \subsection{Demonstration Web Application}
 \label{sec:demonstration_web_application}
@@ -1011,7 +1011,7 @@ In addition, the file owner can easily update file contents, as in \autoref{fig:
 
 \fbox{
   \parbox{0.95\textwidth}{
-    This demonstrates \textbf{a usable application (with a simple interface for users) that works entirely by using and delegating Kerberos tickets, as described in the success criteria}.
+    \textbf{This demonstrates a usable application (with a simple interface for users) that works entirely by using and delegating Kerberos tickets, as described in the success criteria}.
   }
 }
 
@@ -1174,7 +1174,7 @@ filedb2=# SELECT owner, COUNT(*) FROM files_file GROUP BY owner;
 
 \fbox{
   \parbox{0.95\textwidth}{
-    This therefore demonstrates how \textbf{the presence of an SQL injection vulnerability in the constructed application does not allow unauthorised access to data or weaken the threat model of the system}.
+    \textbf{This therefore demonstrates how the presence of an SQL injection vulnerability in the constructed application does not allow unauthorised access to data or weaken the threat model of the system}.
     }
   }
 
@@ -1312,11 +1312,11 @@ From these plots, there is no indication of a reduction in performance compared 
 
 In both sample sets, the \textbf{mean response time} for the ``Kerberos with session cookies'' approach was also below that of the ``master password'' approach. Full timing data is included in the \texttt{testing} directory of the code repository.
 
-Although there is the overhead of the initial request to obtain the session cookie before the response times above are achievable, the same would apply to any single sign-on system (where a user is normally redirected to an external server for authentication, as in the OAuth2 protocol). Therefore, \textbf{the performance overheads associated with this system should not be noticeably greater than in existing single sign-on systems}.
+Although there is the overhead of the initial request to obtain the session cookie before the response times above are achievable, the same would apply to any single sign-on system (where a user is normally redirected to an external server for authentication, as in the OAuth2 protocol). Thus, \textbf{the performance overheads associated with this system should not be noticeably greater than in existing single sign-on systems}.
 
 \fbox{
   \parbox{0.95\textwidth}{
-    \textbf{The project demonstrates an application using delegated Kerberos tickets for secure access to a database, with no noticeable performance penalty}.
+    \textbf{The project therefore demonstrates an application using delegated Kerberos tickets for secure access to a database, with no noticeable performance penalty}.
   }
 }
 
